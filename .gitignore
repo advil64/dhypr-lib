@@ -1,4 +1,5 @@
 .vscode
 .git
 .env
-data/
+air/
+__pycache__

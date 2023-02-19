@@ -15,7 +15,7 @@ class Air(Dataset):
 
     Args:
         root (str): Root directory where the dataset should be saved.
-        name (str): Name of the dataset
+        name (str): task that you want to do on the dataset
         folds (int): Number of folds to split this dataset into as dictated by the user
         transform (callable, optional): A function/transform that takes in an
             :obj:`torch_geometric.data.HeteroData` object and returns a

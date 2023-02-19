@@ -2,4 +2,5 @@
 .git
 .env
 air/
+wiki/
 __pycache__

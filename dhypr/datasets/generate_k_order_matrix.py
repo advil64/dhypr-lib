@@ -59,11 +59,11 @@ def compute_kth_neighbor_out(adj, k, A):
     return 
 
 
-def get_k_order_lp_matrix(edgelist):
+def get_k_order_lp_matrix(edgelist, K=K_max):
     G = nx.from_edgelist(edgelist, create_using=nx.DiGraph)
     adj = nx.adjacency_matrix(G).toarray()
 
-    A = compute_proximity_matrices(adj, K=K_max)
+    A = compute_proximity_matrices(adj, K=K)
     A = {key: sp.csr_matrix(A[key]) for key in A}
 
     return A

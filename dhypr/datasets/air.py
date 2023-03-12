@@ -6,6 +6,8 @@ import networkx as nx
 
 from torch_geometric.data import Data, Dataset, download_url
 from torch_geometric.utils import coalesce
+from datasets.generate_k_order_matrix import get_k_order_lp_matrix
+from datasets.data_utils import mask_edges_general_link_prediction
 from os import remove
 
 class Air(Dataset):
@@ -26,10 +28,15 @@ class Air(Dataset):
             transformed version. The data object will be transformed before
             being saved to disk. (default: :obj:`None`)
     """
-    def __init__(self, root, name, folds=10, transform=None, pre_transform=None, create_k_order=None, pre_filter=None):
+    def __init__(self, name, folds=10, transform=None, pre_transform=mask_edges_general_link_prediction, 
+                 create_k_order=get_k_order_lp_matrix, pre_filter=None):
         self.name = name.lower()
         self.folds = folds
         self.create_k_order = create_k_order
+        root = osp.join(osp.dirname(osp.realpath(__file__)), 'air')
+
+        assert name == 'link_prediction', 'Please enter a valid task name: link_prediction'
+
         super().__init__(root, transform, pre_transform, pre_filter)
 
     @property
@@ -74,11 +81,10 @@ class Air(Dataset):
         for f in range(self.folds):
             print(f'Processing fold {f}')
 
-            train_pos_edges, val_pos_edges, val_neg_edges, test_pos_edges, test_neg_edges = \
-                data if self.pre_transform is None else self.pre_transform(G, split_seed=f)
+            train_pos_edges, val_pos_edges, val_neg_edges, test_pos_edges, test_neg_edges = self.pre_transform(G, split_seed=f)
 
-            # generate a k order matrix if the method is passed
-            k_order_matrix = None if self.create_k_order is None else self.create_k_order(train_pos_edges)
+            # generate a k order matrix
+            k_order_matrix = self.create_k_order(train_pos_edges, 1)
 
             # convert each set of edges into tensors
             src_tr, dest_tr = zip(*train_pos_edges)

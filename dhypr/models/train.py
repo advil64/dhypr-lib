@@ -304,6 +304,8 @@ def load_data(args):
                                         'fold_{}'.format(args.fold)))
             
             # If features are not used, replace feature matrix by identity matrix
+            # TODO: ask what features are and how to calculate them
+            # NOTE: will use the identity matrix for now
             if not args.use_feats:
                 features = sp.identity(adj_train.shape[0])
             

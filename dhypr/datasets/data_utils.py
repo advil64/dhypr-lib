@@ -86,6 +86,17 @@ def mask_edges_general_link_prediction(G, val_percent=0.1, test_percent=0.1, spl
     train_pos_edges = list(train_pos_edges)
     val_test_pos_edges = list(val_test_pos_edges)
 
+    # generate a set of false edges
+    train_neg_edges = []
+    G_train = nx.from_edgelist(train_pos_edges, create_using=nx.DiGraph)
+    nodes_list = list(G_train.nodes)
+        
+    for i, node_i in enumerate(nodes_list):
+        for j, node_j in enumerate(nodes_list):
+            if not G_train.has_edge(node_i, node_j):
+                src, dst = nodes_list[i], nodes_list[j]
+                train_neg_edges.append((src, dst))
+
     val_pos_edges, test_pos_edges  = train_test_split(val_test_pos_edges, test_size=test_size, 
         train_size=val_size, random_state=split_seed, shuffle=True, stratify=None)
     
@@ -103,6 +114,14 @@ def mask_edges_general_link_prediction(G, val_percent=0.1, test_percent=0.1, spl
     val_neg_edges = val_test_neg_edges[:val_size]
     
     test_neg_edges = val_test_neg_edges[val_size:]
+
+    # find the feature matrix
+    # NOTE: using identity matrix as a sub in
+    adj_train = nx.adjacency_matrix(G_train)
+    # TODO: what the heck does sp identity func return?!?
+    # features = sp.identity(adj_train.shape[0])
+    features = np.identity(adj_train.shape[0])
+
     
     '''assert'''
     assert not set(train_pos_edges) == set(val_pos_edges)
@@ -115,6 +134,8 @@ def mask_edges_general_link_prediction(G, val_percent=0.1, test_percent=0.1, spl
     assert not set(val_neg_edges) == set(test_pos_edges)
     assert not set(val_neg_edges) == set(test_neg_edges)
     assert not set(test_pos_edges) == set(test_neg_edges)
+    # TODO: What is the below assertion supposed to do?
+    # assert train_neg_edges.shape[0] + train_neg_edges.shape[0] == len(G_train) * len(G_train)
     
     assert len(train_pos_edges) == train_size
     assert len(val_pos_edges) == val_size
@@ -122,14 +143,12 @@ def mask_edges_general_link_prediction(G, val_percent=0.1, test_percent=0.1, spl
     assert len(test_pos_edges) == test_size
     assert len(test_neg_edges) == test_size
 
-    G_train = nx.from_edgelist(train_pos_edges, create_using=nx.DiGraph)
-
     try:
         assert G_train.number_of_nodes() == G.number_of_nodes()
     except AssertionError:
         print("Task 1 -- Note: the training graph does not contain all nodes in the original graph!!!")
         
-    return train_pos_edges, val_pos_edges, val_neg_edges, test_pos_edges, test_neg_edges
+    return features, train_pos_edges, train_neg_edges, val_pos_edges, val_neg_edges, test_pos_edges, test_neg_edges
 
 
 def mask_edges_bns_link_prediction(G, val_percent=0.1, test_percent=0.1, split_seed=1234):

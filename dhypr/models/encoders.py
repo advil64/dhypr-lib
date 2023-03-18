@@ -10,26 +10,27 @@ from layers.layers import Linear
 import utils.math_utils as pmath
 import pdb
 from utils.data_utils import sparse_mx_to_torch_sparse_tensor, normalize
+import os
 
         
 class DHYPR(nn.Module):
-    def __init__(self, c, args):
+    # TODO: what is c??
+    def __init__(self, c, manifold, num_layers, proximity):
         super(DHYPR, self).__init__()
-        self.args = args
         
-        self.manifold = getattr(manifolds, args.manifold)()
+        self.manifold = manifold
         self.c = c
         
-        assert args.num_layers > 1
+        assert num_layers > 1
         self.dims, self.acts, self.curvatures = hyp_layers.get_dim_act_curv(args)
         self.curvatures.append(c)  
         
-        if args.proximity == 1:
+        if proximity == 1:
             self.model1_d_i = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
             self.model1_d_o = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
             self.model1_n_i = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
             self.model1_n_o = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
-        elif args.proximity == 2:
+        elif proximity == 2:
             self.model1_d_i = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
             self.model1_d_o = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
             self.model1_n_i = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
@@ -38,7 +39,7 @@ class DHYPR(nn.Module):
             self.model2_d_o = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
             self.model2_n_i = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
             self.model2_n_o = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
-        elif args.proximity == 3:
+        elif proximity == 3:
             self.model1_d_i = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
             self.model1_d_o = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
             self.model1_n_i = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)

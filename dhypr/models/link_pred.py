@@ -11,26 +11,27 @@ import time
 import numpy as np
 import optimizers
 import torch
-from config import parser
 from dhypr.models.BaseModel import NCModel, LPModel, SPModel
-from utils.data_utils import load_data
-from utils.train_utils import get_dir_name, format_metrics, save_results
 import pdb
 import torch.nn as nn
+from torch_geometric.data import Data, Dataset, download_url
+from manifolds import PoincareBall
+from manifolds.base import Manifold
+from encoders import DHYPR
 
 
 class LPModel(nn.Module):
-    def __init__(self, args):
+    def __init__(self, data: Dataset, manifold: Manifold=PoincareBall, encoder=DHYPR, num_layers=1):
         super(LPModel, self).__init__()
         
-        assert args.c is None
+        # TODO: ask what this assertion does
+        # assert args.c is None
         self.c = nn.Parameter(torch.Tensor([1.])) 
         
-        self.manifold_name = args.manifold
-        self.manifold = getattr(manifolds, self.manifold_name)()
-        self.nnodes = args.n_nodes       
-        
-        self.encoder = getattr(encoders, args.model)(self.c, args)  
+        self.manifold = manifold
+        self.encoder = encoder(self.c, manifold, num_layers, data.proximity)
+        # TODO: what is this argument
+        # self.nnodes = args.n_nodes
         
         if not args.act:
             act = lambda x: x

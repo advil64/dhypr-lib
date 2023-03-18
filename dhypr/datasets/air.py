@@ -29,10 +29,11 @@ class Air(Dataset):
             being saved to disk. (default: :obj:`None`)
     """
     def __init__(self, name, folds=10, transform=None, pre_transform=mask_edges_general_link_prediction, 
-                 create_k_order=get_k_order_lp_matrix, pre_filter=None):
+                 create_k_order=get_k_order_lp_matrix, proximity=1, pre_filter=None):
         self.name = name.lower()
         self.folds = folds
         self.create_k_order = create_k_order
+        self.proximity = proximity
         root = osp.join(osp.dirname(osp.realpath(__file__)), 'air')
 
         assert name == 'link_prediction', 'Please enter a valid task name: link_prediction'
@@ -81,14 +82,18 @@ class Air(Dataset):
         for f in range(self.folds):
             print(f'Processing fold {f}')
 
-            train_pos_edges, val_pos_edges, val_neg_edges, test_pos_edges, test_neg_edges = self.pre_transform(G, split_seed=f)
+            features, train_pos_edges, train_neg_edges, val_pos_edges, val_neg_edges, \
+                test_pos_edges, test_neg_edges = self.pre_transform(G, split_seed=f)
 
             # generate a k order matrix
-            k_order_matrix = self.create_k_order(train_pos_edges, 1)
+            k_order_matrix = self.create_k_order(train_pos_edges, self.proximity)
 
             # convert each set of edges into tensors
-            src_tr, dest_tr = zip(*train_pos_edges)
-            train_pos_edges = torch.tensor([src_tr, dest_tr])
+            src_tr_pos, dest_tr_pos = zip(*train_pos_edges)
+            train_pos_edges = torch.tensor([src_tr_pos, dest_tr_pos])
+
+            src_tr_neg, dest_tr_neg = zip(*train_neg_edges)
+            train_neg_edges = torch.tensor([src_tr_neg, dest_tr_neg])
 
             src_val_pos, dest_val_pos = zip(*val_pos_edges)
             val_pos_edges = torch.tensor([src_val_pos, dest_val_pos])
@@ -101,11 +106,13 @@ class Air(Dataset):
 
             src_test_neg, dest_test_neg = zip(*test_neg_edges)
             test_neg_edges = torch.tensor([src_test_neg, dest_test_neg])
-
+            
+            features = torch.tensor(features)
             # save as a pt file
             graph = Data(train_pos_edge_index=train_pos_edges, val_pos_edge_index=val_pos_edges, 
                 val_neg_edge_index=val_neg_edges, test_pos_edge_index=test_pos_edges, 
-                test_neg_edge_index=test_neg_edges, k_order_matrix=k_order_matrix)
+                test_neg_edge_index=test_neg_edges, k_order_matrix=k_order_matrix, 
+                train_neg_edge_index=train_neg_edges, features=features)
             torch.save(graph, osp.join(self.processed_dir, f'fold_{f}.pt'))
 
 

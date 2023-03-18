@@ -61,7 +61,6 @@ def compute_kth_neighbor_out(adj, k, A):
 
 
 def get_k_order_lp_matrix(edgelist, K=K_max, normalize_adj=False):
-    #TODO: Find a way to paralellize this computation
     G = nx.from_edgelist(edgelist, create_using=nx.DiGraph)
     adj = nx.adjacency_matrix(G).toarray()
 

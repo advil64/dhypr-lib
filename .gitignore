@@ -3,4 +3,5 @@
 .env
 air/
 wiki/
+data/
 __pycache__

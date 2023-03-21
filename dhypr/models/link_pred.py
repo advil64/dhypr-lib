@@ -9,7 +9,7 @@ import pickle
 import time
 
 import numpy as np
-import optimizers
+from torch.optim import Adam
 import torch
 from dhypr.models.BaseModel import NCModel, LPModel, SPModel
 import pdb
@@ -18,32 +18,35 @@ from torch_geometric.data import Data, Dataset, download_url
 from manifolds import PoincareBall
 from manifolds.base import Manifold
 from encoders import DHYPR
+from layers.layers import GravityDecoder, FermiDiracDecoder
 
 
 class LPModel(nn.Module):
-    def __init__(self, data: Dataset, manifold: Manifold=PoincareBall, encoder=DHYPR, num_layers=1):
+    def __init__(self, data: Dataset, manifold: Manifold=PoincareBall, encoder=DHYPR, num_layers: int=2,
+                 dropout: float=0.05, gamma: float=1.0, lr: float=0.001, momentum: float=0.999,
+                 weight_decay: float=0.001, hidden: int=64, dim: int=32, act=nn.ReLU, bias: int=1,
+                 seed: int=1234, epochs:int=500, lamb: int=5,  wl2: float=0.1, beta: float=1.0):
         super(LPModel, self).__init__()
         
         # TODO: ask what this assertion does
         # assert args.c is None
         self.c = nn.Parameter(torch.Tensor([1.])) 
-        
         self.manifold = manifold
         self.encoder = encoder(self.c, manifold, num_layers, data.proximity)
-        # TODO: what is this argument
+        self.dim = dim # NOTE: embedding dimension?
+        self.bias = bias
+        self.beta = beta
+        self.lamb = lamb
+        # TODO: what is this argument below?
         # self.nnodes = args.n_nodes
         
-        if not args.act:
-            act = lambda x: x
-        else:
-            act = getattr(F, args.act)
+        self.act = act
             
         self.dc = GravityDecoder(
-            self.manifold, args.dim, 1, self.c, act, args.bias, args.beta, args.lamb)  
+            self.manifold, self.dim, 1, self.c, act, self.bias, self.beta, self.lamb)  
         
-        self.nb_false_edges = args.nb_false_edges
-        self.nb_edges = args.nb_edges
-        
+        self.nb_false_edges = len(data.train_neg_edges)
+        self.nb_edges = len(data.nb_edges)
         self.fd_dc = FermiDiracDecoder(r=args.r, t=args.t)
     
         

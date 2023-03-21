@@ -9,22 +9,24 @@ import pdb
 from layers.att_layers import DenseAtt, SpAttn
 
 
-def get_dim_act_curv(args):
-    if not args.act:
-        act = lambda x: x
-    else:
-        act = getattr(F, args.act)
-    acts = [act] * (args.num_layers - 1)
-    dims = [args.feat_dim] + ([args.hidden] * (args.num_layers - 1)) 
-    dims += [args.dim]
+def get_dim_act_curv(num_layers, feat_dim, hidden, dim):
+
+    # TODO update this to be taken as an argument    
+    act = lambda x: x
+
+    # TODO for the love of god add some comments in here and organize this mess
+    acts = [act] * (num_layers - 1)
+    dims = [feat_dim] + ([hidden] * (num_layers - 1)) 
+    dims += [dim]
     acts += [act]
-    n_curvatures = args.num_layers  
-    if args.c is None:
-        curvatures = [nn.Parameter(torch.Tensor([1.])) for _ in range(n_curvatures)]
-    else:
-        curvatures = [torch.tensor([args.c]) for _ in range(n_curvatures)]
-        if not args.cuda == -1:
-            curvatures = [curv.to(args.device) for curv in curvatures]
+    n_curvatures = num_layers  
+    curvatures = [nn.Parameter(torch.Tensor([1.])) for _ in range(n_curvatures)]
+    # if args.c is None:
+    #     curvatures = [nn.Parameter(torch.Tensor([1.])) for _ in range(n_curvatures)]
+    # else:
+    #     curvatures = [torch.tensor([args.c]) for _ in range(n_curvatures)]
+    #     if not args.cuda == -1:
+    #         curvatures = [curv.to(args.device) for curv in curvatures]
     return dims, acts, curvatures
 
 

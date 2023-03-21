@@ -15,43 +15,44 @@ import os
         
 class DHYPR(nn.Module):
     # TODO: what is c??
-    def __init__(self, c, manifold, num_layers, proximity):
+    def __init__(self, c, manifold, num_layers, proximity, feat_dim, hidden, dim):
         super(DHYPR, self).__init__()
         
         self.manifold = manifold
         self.c = c
         
         assert num_layers > 1
-        self.dims, self.acts, self.curvatures = hyp_layers.get_dim_act_curv(args)
-        self.curvatures.append(c)  
+        self.dims, self.acts, self.curvatures = hyp_layers.get_dim_act_curv(num_layers, 
+                                                                            feat_dim, hidden, dim)
+        self.curvatures.append(c)
         
         if proximity == 1:
-            self.model1_d_i = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
-            self.model1_d_o = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
-            self.model1_n_i = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
-            self.model1_n_o = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
+            self.model1_d_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
+            self.model1_d_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
+            self.model1_n_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
+            self.model1_n_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
         elif proximity == 2:
-            self.model1_d_i = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
-            self.model1_d_o = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
-            self.model1_n_i = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
-            self.model1_n_o = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
-            self.model2_d_i = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
-            self.model2_d_o = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
-            self.model2_n_i = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
-            self.model2_n_o = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
+            self.model1_d_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
+            self.model1_d_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
+            self.model1_n_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
+            self.model1_n_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
+            self.model2_d_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
+            self.model2_d_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
+            self.model2_n_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
+            self.model2_n_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
         elif proximity == 3:
-            self.model1_d_i = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
-            self.model1_d_o = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
-            self.model1_n_i = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
-            self.model1_n_o = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
-            self.model2_d_i = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
-            self.model2_d_o = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
-            self.model2_n_i = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
-            self.model2_n_o = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
-            self.model3_d_i = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
-            self.model3_d_o = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
-            self.model3_n_i = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
-            self.model3_n_o = DHYPRLayer(args, self.manifold, self.dims, self.acts, self.curvatures)
+            self.model1_d_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
+            self.model1_d_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
+            self.model1_n_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
+            self.model1_n_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
+            self.model2_d_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
+            self.model2_d_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
+            self.model2_n_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
+            self.model2_n_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
+            self.model3_d_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
+            self.model3_d_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
+            self.model3_n_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
+            self.model3_n_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
         else:
             os._exit(0)
         
@@ -273,7 +274,7 @@ class DHYPR(nn.Module):
     
     
 class DHYPRLayer(nn.Module):
-    def __init__(self, args, manifold, dims, acts, curvatures):
+    def __init__(self, manifold, dims, acts, curvatures, dropout, bias):
         super(DHYPRLayer, self).__init__()
         self.manifold = manifold
         self.curvatures = curvatures

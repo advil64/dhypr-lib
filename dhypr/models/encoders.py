@@ -4,18 +4,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-import manifolds
-import layers.hyp_layers as hyp_layers
-from layers.layers import Linear
-import utils.math_utils as pmath
+import models.layers.hyp_layers as hyp_layers
+from models.layers.layers import Linear
 import pdb
-from utils.data_utils import sparse_mx_to_torch_sparse_tensor, normalize
+from models.utils.utils import sparse_mx_to_torch_sparse_tensor, normalize
 import os
 
         
 class DHYPR(nn.Module):
     # TODO: what is c??
-    def __init__(self, c, manifold, num_layers, proximity, feat_dim, hidden, dim):
+    def __init__(self, c, manifold, num_layers, proximity, feat_dim, hidden, dim, dropout, bias, alpha, n_nodes, use_att: bool=False):
         super(DHYPR, self).__init__()
         
         self.manifold = manifold
@@ -27,42 +25,43 @@ class DHYPR(nn.Module):
         self.curvatures.append(c)
         
         if proximity == 1:
-            self.model1_d_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
-            self.model1_d_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
-            self.model1_n_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
-            self.model1_n_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
+            self.model1_d_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures, dropout, bias)
+            self.model1_d_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures, dropout, bias)
+            self.model1_n_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures, dropout, bias)
+            self.model1_n_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures, dropout, bias)
         elif proximity == 2:
-            self.model1_d_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
-            self.model1_d_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
-            self.model1_n_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
-            self.model1_n_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
-            self.model2_d_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
-            self.model2_d_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
-            self.model2_n_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
-            self.model2_n_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
+            self.model1_d_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures, dropout, bias)
+            self.model1_d_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures, dropout, bias)
+            self.model1_n_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures, dropout, bias)
+            self.model1_n_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures, dropout, bias)
+            self.model2_d_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures, dropout, bias)
+            self.model2_d_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures, dropout, bias)
+            self.model2_n_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures, dropout, bias)
+            self.model2_n_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures, dropout, bias)
         elif proximity == 3:
-            self.model1_d_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
-            self.model1_d_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
-            self.model1_n_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
-            self.model1_n_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
-            self.model2_d_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
-            self.model2_d_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
-            self.model2_n_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
-            self.model2_n_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
-            self.model3_d_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
-            self.model3_d_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
-            self.model3_n_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
-            self.model3_n_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures)
+            self.model1_d_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures, dropout, bias)
+            self.model1_d_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures, dropout, bias)
+            self.model1_n_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures, dropout, bias)
+            self.model1_n_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures, dropout, bias)
+            self.model2_d_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures, dropout, bias)
+            self.model2_d_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures, dropout, bias)
+            self.model2_n_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures, dropout, bias)
+            self.model2_n_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures, dropout, bias)
+            self.model3_d_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures, dropout, bias)
+            self.model3_d_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures, dropout, bias)
+            self.model3_n_i = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures, dropout, bias)
+            self.model3_n_o = DHYPRLayer(self.manifold, self.dims, self.acts, self.curvatures, dropout, bias)
         else:
             os._exit(0)
+
+        n_heads = 1
         
-        self.embed_agg = hyp_layers.HypAttnAgg(self.manifold, c, self.dims[-1], args.dropout, 
-                                               args.alpha, args.use_att, args.n_heads)
+        self.embed_agg = hyp_layers.HypAttnAgg(self.manifold, c, self.dims[-1], dropout, alpha, use_att, n_heads)
         
-        self.proximity = args.proximity
-        self.nnodes = args.n_nodes
-        self.nrepre = args.proximity*4+1
-        self.embed_agg_adj_size = args.n_nodes * self.nrepre
+        self.proximity = proximity
+        self.nnodes = n_nodes
+        self.nrepre = proximity*4+1
+        self.embed_agg_adj_size = n_nodes * self.nrepre
         
         embed_agg_adj = np.zeros((self.embed_agg_adj_size, self.embed_agg_adj_size))
         for n in range(self.nnodes):
@@ -70,16 +69,22 @@ class DHYPR(nn.Module):
             embed_agg_adj[block_start][block_start+1: block_start+self.nrepre] = 1
 
         embed_agg_adj = sp.csr_matrix(embed_agg_adj)
+        # TODO: need to normalize 
         self.embed_agg_adj = sparse_mx_to_torch_sparse_tensor(
-            normalize(embed_agg_adj + sp.eye(embed_agg_adj.shape[0]))).to(args.device)
+            normalize(embed_agg_adj + sp.eye(embed_agg_adj.shape[0])))
     
         
     def forward(self, x, adj):
         if self.proximity == 1:
-            x1_d_is = self.model1_d_i.encode(x, adj['a1_d_i_norm'])
-            x1_d_os = self.model1_d_o.encode(x, adj['a1_d_o_norm'])
-            x1_n_is = self.model1_n_i.encode(x, adj['a1_n_i_norm'])
-            x1_n_os = self.model1_n_o.encode(x, adj['a1_n_o_norm'])
+            # x1_d_is = self.model1_d_i.encode(x, adj['a1_d_i_norm'])
+            # x1_d_os = self.model1_d_o.encode(x, adj['a1_d_o_norm'])
+            # x1_n_is = self.model1_n_i.encode(x, adj['a1_n_i_norm'])
+            # x1_n_os = self.model1_n_o.encode(x, adj['a1_n_o_norm'])
+
+            x1_d_is = self.model1_d_i.encode(x, adj['a1_d_i'])
+            x1_d_os = self.model1_d_o.encode(x, adj['a1_d_o'])
+            x1_n_is = self.model1_n_i.encode(x, adj['a1_n_i'])
+            x1_n_os = self.model1_n_o.encode(x, adj['a1_n_o'])
         
             x1_d_i = x1_d_is[-1]
             x1_d_o = x1_d_os[-1]
@@ -286,7 +291,7 @@ class DHYPRLayer(nn.Module):
             hgc_layers.append(
                     hyp_layers.HyperbolicGraphConvolution(
                         self.manifold, in_dim, out_dim, c_in, c_out, 
-                        args.dropout, act, args.bias
+                        dropout, act, bias
                     )
             )
         self.layers = nn.Sequential(*hgc_layers)

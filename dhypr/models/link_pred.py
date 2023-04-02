@@ -11,47 +11,54 @@ import time
 import numpy as np
 from torch.optim import Adam
 import torch
-from dhypr.models.BaseModel import NCModel, LPModel, SPModel
+# from dhypr.models.BaseModel import NCModel, LPModel, SPModel
 import pdb
 import torch.nn as nn
 from torch_geometric.data import Data, Dataset, download_url
-from manifolds import PoincareBall
-from manifolds.base import Manifold
-from encoders import DHYPR
-from layers.layers import GravityDecoder, FermiDiracDecoder
+from models.manifolds import PoincareBall
+from models.manifolds.base import Manifold
+from models.encoders import DHYPR
+from models.layers.layers import GravityDecoder, FermiDiracDecoder
 
 
 class LPModel(nn.Module):
-    def __init__(self, data: Dataset, manifold: Manifold=PoincareBall, encoder=DHYPR, num_layers: int=2,
+    def __init__(self, data: Data, manifold: Manifold=PoincareBall, encoder=DHYPR, num_layers: int=2,
                  dropout: float=0.05, gamma: float=1.0, lr: float=0.001, momentum: float=0.999,
                  weight_decay: float=0.001, hidden: int=64, dim: int=32, act=nn.ReLU, bias: int=1,
-                 seed: int=1234, epochs:int=500, lamb: int=5,  wl2: float=0.1, beta: float=1.0):
+                 seed: int=1234, epochs:int=500, lamb: int=5,  wl2: float=0.1, beta: float=1.0,
+                 r: float=2.0, t: float=1.0, alpha: float=0.2, proximity: int=1):
         super(LPModel, self).__init__()
         
         # TODO: ask what this assertion does
+        # TODO: what is this argument below?
+        # TODO: what are the correct args for r and t above? 
+        # TODO: how are the different folds used for training?
+        # TODO: did I use the feat dim and nnodes correctly? what are these args even used for?
         # assert args.c is None
         self.c = nn.Parameter(torch.Tensor([1.])) 
         self.manifold = manifold
-        self.encoder = encoder(self.c, manifold, num_layers, data.proximity)
+        self.nnodes, self.feat_dim = data.features.shape
+        self.hidden = hidden
+        self.dim = dim
+        self.encoder = encoder(self.c, manifold, num_layers, proximity, self.feat_dim, self.hidden, dim, dropout, bias, alpha, self.nnodes)
         self.dim = dim # NOTE: embedding dimension?
         self.bias = bias
         self.beta = beta
         self.lamb = lamb
-        # TODO: what is this argument below?
-        # self.nnodes = args.n_nodes
+        self.data = data
         
         self.act = act
             
         self.dc = GravityDecoder(
             self.manifold, self.dim, 1, self.c, act, self.bias, self.beta, self.lamb)  
         
-        self.nb_false_edges = len(data.train_neg_edges)
-        self.nb_edges = len(data.nb_edges)
-        self.fd_dc = FermiDiracDecoder(r=args.r, t=args.t)
+        self.nb_false_edges = data.train_neg_edge_index.shape[1]
+        self.nb_edges = data.train_pos_edge_index.shape[1]
+        self.fd_dc = FermiDiracDecoder(r=r, t=t)
     
-        
-    def encode(self, x, adj):
-        h = self.encoder.forward(x, adj)
+    #TODO: x is the node features list, what happens if nodes don't have features?
+    def encode(self):
+        h = self.encoder.forward(self.data.features, self.data.k_order_matrix)
         return h
     
     
@@ -119,138 +126,138 @@ class LPModel(nn.Module):
 
 
 
-# sets seed
-np.random.seed(args.seed)
-torch.manual_seed(args.seed)
+# # sets seed
+# np.random.seed(args.seed)
+# torch.manual_seed(args.seed)
 
-# set torch dtype
-if int(args.double_precision):
-    torch.set_default_dtype(torch.float64)
-if int(args.cuda) >= 0:
-    torch.cuda.manual_seed(args.seed)
+# # set torch dtype
+# if int(args.double_precision):
+#     torch.set_default_dtype(torch.float64)
+# if int(args.cuda) >= 0:
+#     torch.cuda.manual_seed(args.seed)
 
-# set the device that the model is trained on
-args.device = 'cuda:' + str(args.cuda) if int(args.cuda) >= 0 else 'cpu'
+# # set the device that the model is trained on
+# args.device = 'cuda:' + str(args.cuda) if int(args.cuda) >= 0 else 'cpu'
 
-# TODO: what is patience?
-args.patience = args.epochs if not args.patience else  int(args.patience)
+# # TODO: what is patience?
+# args.patience = args.epochs if not args.patience else  int(args.patience)
 
-# set logging
-logging.getLogger().setLevel(logging.INFO)
+# # set logging
+# logging.getLogger().setLevel(logging.INFO)
 
-# Load data
-data = load_data(args)
-args.n_nodes, args.feat_dim = data['features'].shape
+# # Load data
+# data = load_data(args)
+# args.n_nodes, args.feat_dim = data['features'].shape
 
-Model = LPModel # set the model as the one you want
-args.nb_false_edges = len(data['train_edges_false'])
-args.nb_edges = len(data['train_edges'])
+# Model = LPModel # set the model as the one you want
+# args.nb_false_edges = len(data['train_edges_false'])
+# args.nb_edges = len(data['train_edges'])
 
-# Model and optimizer
-model = Model(args)
-logging.info(str(model))
+# # Model and optimizer
+# model = Model(args)
+# logging.info(str(model))
 
-optimizer = getattr(optimizers, args.optimizer)(params=model.parameters(), lr=args.lr,
-                                                weight_decay=args.weight_decay)
-lr_scheduler = torch.optim.lr_scheduler.StepLR(
-    optimizer,
-    step_size=int(args.lr_reduce_freq),
-    gamma=float(args.gamma)
-)
-tot_params = sum([np.prod(p.size()) for p in model.parameters()])
-logging.info(f"Total number of parameters: {tot_params}")
-if args.cuda is not None and int(args.cuda) >= 0 :
-    os.environ['CUDA_VISIBLE_DEVICES'] = str(args.cuda)
-    model = model.to(args.device)
-    for x, val in data.items():
-        if torch.is_tensor(data[x]):
-            data[x] = data[x].to(args.device)
-        if isinstance(val, dict):
-            for vk, vval in val.items():
-                if torch.is_tensor(data[x][vk]):
-                    data[x][vk] = data[x][vk].to(args.device)
+# optimizer = getattr(optimizers, args.optimizer)(params=model.parameters(), lr=args.lr,
+#                                                 weight_decay=args.weight_decay)
+# lr_scheduler = torch.optim.lr_scheduler.StepLR(
+#     optimizer,
+#     step_size=int(args.lr_reduce_freq),
+#     gamma=float(args.gamma)
+# )
+# tot_params = sum([np.prod(p.size()) for p in model.parameters()])
+# logging.info(f"Total number of parameters: {tot_params}")
+# if args.cuda is not None and int(args.cuda) >= 0 :
+#     os.environ['CUDA_VISIBLE_DEVICES'] = str(args.cuda)
+#     model = model.to(args.device)
+#     for x, val in data.items():
+#         if torch.is_tensor(data[x]):
+#             data[x] = data[x].to(args.device)
+#         if isinstance(val, dict):
+#             for vk, vval in val.items():
+#                 if torch.is_tensor(data[x][vk]):
+#                     data[x][vk] = data[x][vk].to(args.device)
 
-# Train model
-t_total = time.time()
-counter = 0
-best_val_metrics = model.init_metric_dict()
-best_test_metrics = None
-best_emb = None
-for epoch in range(args.epochs):
-    t = time.time()
-    model.train()
-    optimizer.zero_grad()
-    if args.use_att:
-        embeddings_all, attn_weights = model.encode(data['features'], data['adj_train_norm'])
-    else:
-        embeddings_all = model.encode(data['features'], data['adj_train_norm'])
-    embeddings = embeddings_all[-1]
-    train_metrics = model.compute_metrics(args, embeddings, data, 'train')
-    train_metrics['loss'].backward()
-    if args.grad_clip is not None:
-        max_norm = float(args.grad_clip)
-        all_params = list(model.parameters())
-        for param in all_params:
-            torch.nn.utils.clip_grad_norm_(param, max_norm)
-    optimizer.step()
-    lr_scheduler.step()
-    if (epoch + 1) % args.log_freq == 0:
-        logging.info(" ".join(['Epoch: {:04d}'.format(epoch + 1),
-                                'lr: {}'.format(lr_scheduler.get_lr()[0]),
-                                format_metrics(train_metrics, 'train'),
-                                'time: {:.4f}s'.format(time.time() - t)
-                                ]))
-    if (epoch + 1) % args.eval_freq == 0:
-        model.eval()
-        if args.use_att:
-            embeddings_all, attn_weights = model.encode(data['features'], data['adj_train_norm'])
-        else:
-            embeddings_all = model.encode(data['features'], data['adj_train_norm'])
-        embeddings = embeddings_all[-1]
-        val_metrics = model.compute_metrics(args, embeddings, data, 'val')
-        if (epoch + 1) % args.log_freq == 0:
-            logging.info(" ".join(['Epoch: {:04d}'.format(epoch + 1), format_metrics(val_metrics, 'val')]))
-        if model.has_improved(best_val_metrics, val_metrics):
-            test_metrics = model.compute_metrics(args, embeddings, data, 'test')
-            logging.info(" ".join(['Epoch: {:04d}'.format(epoch + 1), format_metrics(test_metrics, 'test')]))
-            with open(os.path.join(save_dir, 'result.txt'), 'w') as f:
-                f.writelines(" ".join(["Test set results:", format_metrics(test_metrics, 'test')]))
+# # Train model
+# t_total = time.time()
+# counter = 0
+# best_val_metrics = model.init_metric_dict()
+# best_test_metrics = None
+# best_emb = None
+# for epoch in range(args.epochs):
+#     t = time.time()
+#     model.train()
+#     optimizer.zero_grad()
+#     if args.use_att:
+#         embeddings_all, attn_weights = model.encode(data['features'], data['adj_train_norm'])
+#     else:
+#         embeddings_all = model.encode(data['features'], data['adj_train_norm'])
+#     embeddings = embeddings_all[-1]
+#     train_metrics = model.compute_metrics(args, embeddings, data, 'train')
+#     train_metrics['loss'].backward()
+#     if args.grad_clip is not None:
+#         max_norm = float(args.grad_clip)
+#         all_params = list(model.parameters())
+#         for param in all_params:
+#             torch.nn.utils.clip_grad_norm_(param, max_norm)
+#     optimizer.step()
+#     lr_scheduler.step()
+#     if (epoch + 1) % args.log_freq == 0:
+#         logging.info(" ".join(['Epoch: {:04d}'.format(epoch + 1),
+#                                 'lr: {}'.format(lr_scheduler.get_lr()[0]),
+#                                 format_metrics(train_metrics, 'train'),
+#                                 'time: {:.4f}s'.format(time.time() - t)
+#                                 ]))
+#     if (epoch + 1) % args.eval_freq == 0:
+#         model.eval()
+#         if args.use_att:
+#             embeddings_all, attn_weights = model.encode(data['features'], data['adj_train_norm'])
+#         else:
+#             embeddings_all = model.encode(data['features'], data['adj_train_norm'])
+#         embeddings = embeddings_all[-1]
+#         val_metrics = model.compute_metrics(args, embeddings, data, 'val')
+#         if (epoch + 1) % args.log_freq == 0:
+#             logging.info(" ".join(['Epoch: {:04d}'.format(epoch + 1), format_metrics(val_metrics, 'val')]))
+#         if model.has_improved(best_val_metrics, val_metrics):
+#             test_metrics = model.compute_metrics(args, embeddings, data, 'test')
+#             logging.info(" ".join(['Epoch: {:04d}'.format(epoch + 1), format_metrics(test_metrics, 'test')]))
+#             with open(os.path.join(save_dir, 'result.txt'), 'w') as f:
+#                 f.writelines(" ".join(["Test set results:", format_metrics(test_metrics, 'test')]))
             
             
-            if args.save:
-                if not args.savespace:
-                    best_emb_all = embeddings_all
-                    if args.use_att:
-                        best_attn_weights = attn_weights
-                    else:
-                        best_attn_weights = None
-                    save_results(save_dir, best_emb_all, best_attn_weights, print_statement=True)
+#             if args.save:
+#                 if not args.savespace:
+#                     best_emb_all = embeddings_all
+#                     if args.use_att:
+#                         best_attn_weights = attn_weights
+#                     else:
+#                         best_attn_weights = None
+#                     save_results(save_dir, best_emb_all, best_attn_weights, print_statement=True)
 
-                    torch.save(model.state_dict(), os.path.join(save_dir, 'model.pth'))
-                    logging.info(f"Saved model in {save_dir}")
+#                     torch.save(model.state_dict(), os.path.join(save_dir, 'model.pth'))
+#                     logging.info(f"Saved model in {save_dir}")
                 
-            best_val_metrics = val_metrics
-            best_test_metrics = test_metrics
-            counter = 0
-        else:
-            counter += 1
-            if counter == args.patience: 
-                logging.info("Early stopping")
-                break
+#             best_val_metrics = val_metrics
+#             best_test_metrics = test_metrics
+#             counter = 0
+#         else:
+#             counter += 1
+#             if counter == args.patience: 
+#                 logging.info("Early stopping")
+#                 break
 
-logging.info("Optimization Finished!")
-logging.info("Total train time elapsed: {:.4f}s".format(time.time() - t_total))
+# logging.info("Optimization Finished!")
+# logging.info("Total train time elapsed: {:.4f}s".format(time.time() - t_total))
 
-logging.info(" ".join(["Val set results:", format_metrics(best_val_metrics, 'val')]))
-logging.info(" ".join(["Test set results:", format_metrics(best_test_metrics, 'test')]))
+# logging.info(" ".join(["Val set results:", format_metrics(best_val_metrics, 'val')]))
+# logging.info(" ".join(["Test set results:", format_metrics(best_test_metrics, 'test')]))
 
-if args.save:
-    with open(os.path.join(save_dir, 'result.txt'), 'w') as f:
-        f.writelines(" ".join(["Test set results:", format_metrics(best_test_metrics, 'test')]))
+# if args.save:
+#     with open(os.path.join(save_dir, 'result.txt'), 'w') as f:
+#         f.writelines(" ".join(["Test set results:", format_metrics(best_test_metrics, 'test')]))
 
-    with open(os.path.join(save_dir, 'finished'), 'w') as f:
-        f.writelines("Optimization Finished!\n" + 
-                        "Total train time elapsed: {:.4f}s\n\n".format(time.time() - t_total))
-    logging.info(f"Saved data/log in {save_dir}") 
-else:
-    logging.info(f"Saved log in ./log.txt") 
+#     with open(os.path.join(save_dir, 'finished'), 'w') as f:
+#         f.writelines("Optimization Finished!\n" + 
+#                         "Total train time elapsed: {:.4f}s\n\n".format(time.time() - t_total))
+#     logging.info(f"Saved data/log in {save_dir}") 
+# else:
+#     logging.info(f"Saved log in ./log.txt") 

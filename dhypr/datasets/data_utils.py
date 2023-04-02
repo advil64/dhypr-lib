@@ -119,6 +119,8 @@ def mask_edges_general_link_prediction(G, val_percent=0.1, test_percent=0.1, spl
     # NOTE: using identity matrix as a sub in
     adj_train = nx.adjacency_matrix(G_train)
     # TODO: what the heck does sp identity func return?!?
+    # TODO: these are the features of the edges? or are the features of the nodes?
+    # this is the features of the nodes but I have to make a mapping I think otherwise we loose the order
     # features = sp.identity(adj_train.shape[0])
     features = np.identity(adj_train.shape[0])
 
@@ -135,7 +137,7 @@ def mask_edges_general_link_prediction(G, val_percent=0.1, test_percent=0.1, spl
     assert not set(val_neg_edges) == set(test_neg_edges)
     assert not set(test_pos_edges) == set(test_neg_edges)
     # TODO: What is the below assertion supposed to do?
-    # assert train_neg_edges.shape[0] + train_neg_edges.shape[0] == len(G_train) * len(G_train)
+    # assert train_neg_edges.shape[0] + train_pos_edges.shape[0] == len(G_train) * len(G_train)
     
     assert len(train_pos_edges) == train_size
     assert len(val_pos_edges) == val_size

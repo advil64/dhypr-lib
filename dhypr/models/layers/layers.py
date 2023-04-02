@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch.nn.modules.module import Module
 from torch.nn.parameter import Parameter
 import pdb
-from layers.hyp_layers import HypLinear, HypAct
+from models.layers.hyp_layers import HypLinear, HypAct
 
 
 class Linear(Module):

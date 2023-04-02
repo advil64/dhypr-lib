@@ -6,7 +6,7 @@ import torch.nn.init as init
 from torch.nn.modules.module import Module
 from torch.nn.parameter import Parameter
 import pdb
-from layers.att_layers import DenseAtt, SpAttn
+from models.layers.att_layers import DenseAtt, SpAttn
 
 
 def get_dim_act_curv(num_layers, feat_dim, hidden, dim):

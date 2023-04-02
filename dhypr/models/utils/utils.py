@@ -7,6 +7,7 @@ import torch.nn.functional as F
 import torch.nn.modules.loss
 import pdb
 import pickle
+import scipy.sparse as sp
 
 
 def format_metrics(metrics, split):
@@ -104,4 +105,21 @@ def save_results(save_dir, embeddings, attn_weights, print_statement=False):
         if print_statement:
             print('Dumped attention weights of every layer: ' + os.path.join(save_dir, 'attn_weights.pkl'))
 
-    return 
+    return
+
+def normalize(mx):
+    rowsum = np.array(mx.sum(1))
+    r_inv = np.power(rowsum, -1).flatten()
+    r_inv[np.isinf(r_inv)] = 0.
+    r_mat_inv = sp.diags(r_inv)
+    mx = r_mat_inv.dot(mx)
+    return mx
+
+def sparse_mx_to_torch_sparse_tensor(sparse_mx):
+    sparse_mx = sparse_mx.tocoo()
+    indices = torch.from_numpy(
+            np.vstack((sparse_mx.row, sparse_mx.col)).astype(np.int64)
+    )
+    values = torch.Tensor(sparse_mx.data)
+    shape = torch.Size(sparse_mx.shape)
+    return torch.sparse.FloatTensor(indices, values, shape)

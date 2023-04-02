@@ -112,7 +112,7 @@ class Air(Dataset):
             graph = Data(train_pos_edge_index=train_pos_edges, val_pos_edge_index=val_pos_edges, 
                 val_neg_edge_index=val_neg_edges, test_pos_edge_index=test_pos_edges, 
                 test_neg_edge_index=test_neg_edges, k_order_matrix=k_order_matrix, 
-                train_neg_edge_index=train_neg_edges, features=features)
+                x=features, num_nodes=features.shape[0], num_features=features.shape[1])
             torch.save(graph, osp.join(self.processed_dir, f'fold_{f}.pt'))
 
 

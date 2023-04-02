@@ -7,23 +7,20 @@ import torch_geometric.transforms as T
 from torch_geometric.datasets import Planetoid
 from torch_geometric.nn import GCNConv
 from torch_geometric.utils import negative_sampling
-from datasets.air import Air
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 transform = T.Compose([
     T.NormalizeFeatures(),
     T.ToDevice(device),
-    # T.RandomLinkSplit(num_val=0.05, num_test=0.1, is_undirected=False,
-    #                   add_negative_train_samples=False),
+    T.RandomLinkSplit(num_val=0.05, num_test=0.1, is_undirected=True,
+                      add_negative_train_samples=False),
 ])
 path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', 'Planetoid')
-dataset = Air('link_prediction', transform=transform).get(0)#Planetoid(path, name='Cora', transform=transform)
+dataset = Planetoid(path, name='Cora', transform=transform)
 # After applying the `RandomLinkSplit` transform, the data is transformed from
 # a data object to a list of tuples (train_data, val_data, test_data), with
 # each element representing the corresponding split.
-train_data = dataset.train_pos_edge_index
-val_data = dataset.val_pos_edge_index
-test_data = dataset.test_pos_edge_index
+train_data, val_data, test_data = dataset[0]
 
 
 class Net(torch.nn.Module):
@@ -52,7 +49,7 @@ criterion = torch.nn.BCEWithLogitsLoss()
 def train():
     model.train()
     optimizer.zero_grad()
-    z = model.encode(dataset.x, train_data)
+    z = model.encode(train_data.x, train_data.edge_index)
 
     # We perform a new round of negative sampling for every training epoch:
     neg_edge_index = negative_sampling(

@@ -3,11 +3,13 @@ import tarfile
 
 import os.path as osp
 import networkx as nx
+import numpy as np
 
 from torch_geometric.data import Data, Dataset, download_url
 from torch_geometric.utils import coalesce
 from datasets.generate_k_order_matrix import get_k_order_lp_matrix
 from datasets.data_utils import mask_edges_general_link_prediction
+from torch_geometric.typing import SparseTensor
 from os import remove
 
 class Air(Dataset):
@@ -20,25 +22,23 @@ class Air(Dataset):
         name (str): task that you want to do on the dataset
         folds (int): Number of folds to split this dataset into as dictated by the user
         transform (callable, optional): A function/transform that takes in an
-            :obj:`torch_geometric.data.HeteroData` object and returns a
+            :obj:`torch_geometric.data.Data` object and returns a
             transformed version. The data object will be transformed before
             every access. (default: :obj:`None`)
         pre_transform (callable, optional): A function/transform that takes in
-            an :obj:`torch_geometric.data.HeteroData` object and returns a
+            an :obj:`torch_geometric.data.Data` object and returns a
             transformed version. The data object will be transformed before
             being saved to disk. (default: :obj:`None`)
     """
-    def __init__(self, name, folds=10, transform=None, pre_transform=mask_edges_general_link_prediction, 
-                 create_k_order=get_k_order_lp_matrix, proximity=1, pre_filter=None):
+    def __init__(self, name='air', transform=None, pre_transform=get_k_order_lp_matrix, 
+                proximity=1, pre_filter=None, root=None):
         self.name = name.lower()
-        self.folds = folds
-        self.create_k_order = create_k_order
         self.proximity = proximity
-        root = osp.join(osp.dirname(osp.realpath(__file__)), 'air')
-
-        assert name == 'link_prediction', 'Please enter a valid task name: link_prediction'
+        if root is None:
+            root = osp.join(osp.dirname(osp.realpath(__file__)), 'air')
 
         super().__init__(root, transform, pre_transform, pre_filter)
+        self.data = torch.load(self.processed_paths[0])
 
     @property
     def raw_dir(self) -> str:
@@ -54,7 +54,7 @@ class Air(Dataset):
 
     @property
     def processed_file_names(self):
-        return [f'fold_{i}.pt' for i in range(self.folds)]
+        return ['data.pt']
 
     def download(self):
         url = 'http://konect.cc/files/download.tsv.maayan-faa.tar.bz2'
@@ -77,48 +77,25 @@ class Air(Dataset):
             for row in data:
                 src, dst = row.split()
                 G.add_edge(int(src), int(dst))
-        
-        # split into k-folds and generate the task masking
-        for f in range(self.folds):
-            print(f'Processing fold {f}')
 
-            features, train_pos_edges, train_neg_edges, val_pos_edges, val_neg_edges, \
-                test_pos_edges, test_neg_edges = self.pre_transform(G, split_seed=f)
+        # generate a dummy features tensor
+        adj_matrix = nx.adjacency_matrix(G)
+        features = torch.eye(adj_matrix.shape[0])
 
-            # generate a k order matrix
-            k_order_matrix = self.create_k_order(train_pos_edges, self.proximity)
+        # get all edges
+        original_all_edges = list(G.edges())
+        src_pos, dest_pos = zip(*original_all_edges)
+        edges = torch.tensor([src_pos, dest_pos])
 
-            # convert each set of edges into tensors
-            src_tr_pos, dest_tr_pos = zip(*train_pos_edges)
-            train_pos_edges = torch.tensor([src_tr_pos, dest_tr_pos])
+        # generate the k order matrix
+        k_order_matrix = self.pre_transform(original_all_edges, self.proximity)
 
-            src_tr_neg, dest_tr_neg = zip(*train_neg_edges)
-            train_neg_edges = torch.tensor([src_tr_neg, dest_tr_neg])
-
-            src_val_pos, dest_val_pos = zip(*val_pos_edges)
-            val_pos_edges = torch.tensor([src_val_pos, dest_val_pos])
-
-            src_val_neg, dest_val_neg = zip(*val_neg_edges)
-            val_neg_edges = torch.tensor([src_val_neg, dest_val_neg])
-
-            src_test_pos, dest_test_pos = zip(*test_pos_edges)
-            test_pos_edges = torch.tensor([src_test_pos, dest_test_pos])
-
-            src_test_neg, dest_test_neg = zip(*test_neg_edges)
-            test_neg_edges = torch.tensor([src_test_neg, dest_test_neg])
-            
-            features = torch.tensor(features)
-            # save as a pt file
-            graph = Data(train_pos_edge_index=train_pos_edges, val_pos_edge_index=val_pos_edges, 
-                val_neg_edge_index=val_neg_edges, test_pos_edge_index=test_pos_edges, 
-                test_neg_edge_index=test_neg_edges, k_order_matrix=k_order_matrix, 
-                x=features, num_nodes=features.shape[0], num_features=features.shape[1])
-            torch.save(graph, osp.join(self.processed_dir, f'fold_{f}.pt'))
-
+        self.data = Data(edge_index=edges, x=features, num_nodes=features.shape[0], num_features=features.shape[1], k_order_matrix=k_order_matrix,)
+        torch.save(self.data, self.processed_paths[0])
 
     def len(self):
         return len(self.processed_file_names)
 
     def get(self, idx):
-        data = torch.load(osp.join(self.processed_dir, f'fold_{idx}.pt'))
+        data = torch.load(osp.join(self.processed_dir, 'data.pt'))
         return data

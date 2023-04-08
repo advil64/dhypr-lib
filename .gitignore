@@ -3,5 +3,6 @@
 .env
 air/
 wiki/
+wiki-vote/
 data/
 __pycache__

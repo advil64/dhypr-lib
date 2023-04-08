@@ -7,8 +7,6 @@ import numpy as np
 
 from torch_geometric.data import Data, Dataset, download_url
 from torch_geometric.utils import coalesce
-from datasets.generate_k_order_matrix import get_k_order_lp_matrix
-from datasets.data_utils import mask_edges_general_link_prediction
 from torch_geometric.typing import SparseTensor
 from os import remove
 
@@ -30,7 +28,7 @@ class Air(Dataset):
             transformed version. The data object will be transformed before
             being saved to disk. (default: :obj:`None`)
     """
-    def __init__(self, name='air', transform=None, pre_transform=get_k_order_lp_matrix, 
+    def __init__(self, name='air', transform=None, pre_transform=None, 
                 proximity=1, pre_filter=None, root=None):
         self.name = name.lower()
         self.proximity = proximity
@@ -76,7 +74,7 @@ class Air(Dataset):
             data = f.read().split('\n')[1:-1]
             for row in data:
                 src, dst = row.split()
-                G.add_edge(int(src), int(dst))
+                G.add_edge(int(src)-1, int(dst)-1) #NOTE: -1 to make the nodes zero indexed
 
         # generate a dummy features tensor
         adj_matrix = nx.adjacency_matrix(G)
@@ -88,9 +86,9 @@ class Air(Dataset):
         edges = torch.tensor([src_pos, dest_pos])
 
         # generate the k order matrix
-        k_order_matrix = self.pre_transform(original_all_edges, self.proximity)
+        # k_order_matrix = self.pre_transform(original_all_edges, self.proximity)
 
-        self.data = Data(edge_index=edges, x=features, num_nodes=features.shape[0], num_features=features.shape[1], k_order_matrix=k_order_matrix,)
+        self.data = Data(edge_index=edges, x=features, num_nodes=features.size(dim=0), num_features=features.size(dim=1))
         torch.save(self.data, self.processed_paths[0])
 
     def len(self):

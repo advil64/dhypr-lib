@@ -4,7 +4,9 @@ import torch
 from sklearn.metrics import roc_auc_score
 
 import torch_geometric.transforms as T
-from torch_geometric.datasets import Planetoid
+from torch_geometric.datasets import SNAPDataset
+from datasets.air import Air
+from datasets.generate_k_order_matrix import KOrderMatrix
 from torch_geometric.nn import GCNConv
 from torch_geometric.utils import negative_sampling
 
@@ -12,11 +14,15 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 transform = T.Compose([
     T.NormalizeFeatures(),
     T.ToDevice(device),
+    KOrderMatrix(), # NOTE: must calculate k order matrix before creating the random link split
     T.RandomLinkSplit(num_val=0.05, num_test=0.1, is_undirected=True,
-                      add_negative_train_samples=False),
+                      add_negative_train_samples=False)
 ])
-path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', 'Planetoid')
-dataset = Planetoid(path, name='Cora', transform=transform)
+# path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', 'Planetoid')
+# dataset = Planetoid(path, name='Cora', transform=transform)
+path = osp.join(osp.dirname(osp.realpath(__file__)), '.', 'datasets')
+dataset = Air(root = path, name='Air', transform=transform)
+# dataset = SNAPDataset(path, name='wiki-vote', transform=transform)
 # After applying the `RandomLinkSplit` transform, the data is transformed from
 # a data object to a list of tuples (train_data, val_data, test_data), with
 # each element representing the corresponding split.

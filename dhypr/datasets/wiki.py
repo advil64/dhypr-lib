@@ -6,7 +6,7 @@ import networkx as nx
 from torch_geometric.data import Data, Dataset, download_url, extract_gz
 from torch_geometric.utils import convert
 from torch_geometric.transforms import RandomLinkSplit, RandomNodeSplit
-from datasets.generate_k_order_matrix import get_k_order_lp_matrix
+from dhypr.datasets.custom_transforms import get_k_order_lp_matrix
 from os import remove
 
 class Wiki(Dataset):

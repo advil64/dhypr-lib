@@ -82,11 +82,15 @@ class Air(Dataset):
 
         # get all edges
         original_all_edges = list(G.edges())
+
+        if self.pre_filter is not None:
+            original_all_edges = [edge for edge in original_all_edges if self.pre_filter(edge)]
+
+        if self.pre_transform is not None:
+            original_all_edges = [edge for edge in original_all_edges if self.pre_transform(edge)]
+        
         src_pos, dest_pos = zip(*original_all_edges)
         edges = torch.tensor([src_pos, dest_pos])
-
-        # generate the k order matrix
-        # k_order_matrix = self.pre_transform(original_all_edges, self.proximity)
 
         self.data = Data(edge_index=edges, x=features, num_nodes=features.size(dim=0), num_features=features.size(dim=1))
         torch.save(self.data, self.processed_paths[0])

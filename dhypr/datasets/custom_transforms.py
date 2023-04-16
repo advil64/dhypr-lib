@@ -41,7 +41,7 @@ class GetKOrderMatrix(BaseTransform):
         data: Data,
     ) -> Data:
         print("Generating k-order matrix...")
-        self.adj = to_dense_adj(data.edge_index)[0].float()
+        self.adj = to_dense_adj(data.edge_label_index)[0].float()
 
         (
             data.k_diffusion_in,
@@ -49,6 +49,8 @@ class GetKOrderMatrix(BaseTransform):
             data.k_neighbor_in,
             data.k_neighbor_out,
         ) = self._compute_proximity_matrices()
+        data.proximity = self.k
+        data.adj = self.adj
         print("Done!")
         return data
 

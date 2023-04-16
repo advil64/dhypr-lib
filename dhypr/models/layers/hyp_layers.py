@@ -9,24 +9,18 @@ import pdb
 from models.layers.att_layers import DenseAtt, SpAttn
 
 
-def get_dim_act_curv(num_layers, feat_dim, hidden, dim):
+def get_dim_act_curv(num_layers, feat_dim, hidden, dim, act, c, device):
 
-    # TODO update this to be taken as an argument    
-    act = lambda x: x
-
-    # TODO for the love of god add some comments in here and organize this mess
     acts = [act] * (num_layers - 1)
-    dims = [feat_dim] + ([hidden] * (num_layers - 1)) 
+    dims = [feat_dim] + ([hidden] * (num_layers - 1))  
     dims += [dim]
     acts += [act]
-    n_curvatures = num_layers  
-    curvatures = [nn.Parameter(torch.Tensor([1.])) for _ in range(n_curvatures)]
-    # if args.c is None:
-    #     curvatures = [nn.Parameter(torch.Tensor([1.])) for _ in range(n_curvatures)]
-    # else:
-    #     curvatures = [torch.tensor([args.c]) for _ in range(n_curvatures)]
-    #     if not args.cuda == -1:
-    #         curvatures = [curv.to(args.device) for curv in curvatures]
+    n_curvatures = num_layers
+    if c is None:
+        curvatures = [nn.Parameter(torch.Tensor([1.])) for _ in range(n_curvatures)]
+    else:
+        curvatures = [torch.tensor([c]) for _ in range(n_curvatures)]
+        curvatures = [curv.to(device) for curv in curvatures]
     return dims, acts, curvatures
 
 

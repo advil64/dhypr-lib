@@ -1,10 +1,10 @@
 import manifolds
-import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch
 
-from layers.layers import Linear
-import pdb
+from layers.att_layers import GraphAttentionLayer
+from layers.layers import GraphConvolution, Linear
 
 
 class Decoder(nn.Module):
@@ -19,6 +19,21 @@ class Decoder(nn.Module):
         else:
             probs = self.cls.forward(x)
         return probs
+
+
+class GCNDecoder(Decoder):
+    def __init__(self, c, args):
+        super(GCNDecoder, self).__init__(c)
+        act = lambda x: x
+        self.cls = GraphConvolution(args.dim, args.n_classes, args.dropout, act, args.bias)
+        self.decode_adj = True
+
+
+class GATDecoder(Decoder):
+    def __init__(self, c, args):
+        super(GATDecoder, self).__init__(c)
+        self.cls = GraphAttentionLayer(args.dim, args.n_classes, args.dropout, F.elu, args.alpha, 1, True)
+        self.decode_adj = True
 
 
 class LinearDecoder(Decoder):
@@ -40,7 +55,7 @@ class LinearDecoder(Decoder):
                 self.input_dim, self.output_dim, self.bias, self.c
         )
     
-    
+
 class SPDecoder(nn.Module):
     def __init__(self, c, args):
         super(SPDecoder, self).__init__()
@@ -63,7 +78,12 @@ class SPDecoder(nn.Module):
                 self.input_dim, self.output_dim, self.bias, self.c
         )
 
-
+    
 model2decoder = {
-    'DHYPR': LinearDecoder
+    'GCN': GCNDecoder,
+    'GAT': GATDecoder,
+    'HNN': LinearDecoder,
+    'HGCN': LinearDecoder,
+    'MLP': LinearDecoder,
+    'Shallow': LinearDecoder,
 }

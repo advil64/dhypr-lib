@@ -1,28 +1,34 @@
 import os.path as osp
 
 import torch
-from sklearn.metrics import roc_auc_score
+import torch.nn as nn
+from sklearn.metrics import roc_auc_score, average_precision_score
+import numpy as np
 
 import torch_geometric.transforms as T
 from torch_geometric.datasets import SNAPDataset, Planetoid
+from torch_geometric.utils import negative_sampling
+
+from models.manifolds.poincare import PoincareBall
+from models.encoders import DHYPR
+from models.layers.layers import FermiDiracDecoder, GravityDecoder
+
 from datasets.air import Air
 from datasets.custom_transforms import GetKOrderMatrix, CreateDummyFeatures
-from torch_geometric.nn import GCNConv
-from torch_geometric.utils import negative_sampling
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 transform = T.Compose([
     CreateDummyFeatures(),
     T.NormalizeFeatures(),
     T.ToDevice(device),
-    GetKOrderMatrix(), # NOTE: must calculate k order matrix before creating the random link split
     T.RandomLinkSplit(num_val=0.05, num_test=0.1, is_undirected=True,
-                      add_negative_train_samples=False)
+                      add_negative_train_samples=False), # TODO: check if the random link split preserves the number of nodes in each set
+    GetKOrderMatrix(),
 ])
 path = osp.join(osp.dirname(osp.realpath(__file__)), '.', 'datasets')
-dataset = Air(root = path, name='Air', transform=transform)
-# dataset = SNAPDataset(path, name='wiki-vote', transform=transform)
+# dataset = Air(root = path, name='Air', transform=transform)
 # dataset = Planetoid(path, name='Cora', transform=transform)
+dataset = SNAPDataset(path, name='wiki-vote', transform=transform)
 
 '''
 NOTE: After applying the `RandomLinkSplit` transform, the data is transformed from
@@ -32,26 +38,43 @@ each element representing the corresponding split.
 
 train_data, val_data, test_data = dataset[0]
 
+class LPModel(nn.Module):
+    def __init__(self, nnodes: int, feat_dim: int, proximity: int, num_layers: int=2, dropout: float=0.05, gamma: float=1.0, 
+                 lr: float=0.001, momentum: float=0.999, weight_decay: float=0.001, hidden: int=64, device= 'cpu',
+                 dim: int=32, bias: int=1, seed: int=1234, epochs:int=500, lamb: float=0.1,  
+                 wl2: float=0.1, beta: float=1.0, r: float=2.0, t: float=1.0, alpha: float=0.2):
+        super(LPModel, self).__init__()
+        
+        self.c = nn.Parameter(torch.Tensor([1.]))
+        self.manifold = PoincareBall()
+        self.act = nn.ReLU()
+        
+        self.encoder = DHYPR(self.manifold, num_layers, proximity, feat_dim, hidden, dim, dropout, bias, alpha, nnodes, self.act, device)
+        self.dc = GravityDecoder(self.manifold, dim, 1, self.c, self.act, bias, beta, lamb)  
+        self.fd_dc = FermiDiracDecoder(r, t)
+        
+    def encode(self, x, adj, k_diffusion_in, k_diffusion_out, k_neighbor_in, k_neighbor_out):
+        h = self.encoder.forward(x, adj, k_diffusion_in, k_diffusion_out, k_neighbor_in, k_neighbor_out)
+        return h
+    
+    def decode(self, h, idx): 
+        emb_in = h[idx[:, 0], :]   
+        emb_out = h[idx[:, 1], :]  
+        sqdist = self.manifold.sqdist(emb_in, emb_out, self.c)  
+        # squared distance between pairs of nodes in the hyperbolic space
+        probs, mass = self.dc.forward(h, idx, sqdist)
+        return probs, mass
+    
+    
+    def fd_decode(self, h, idx):
+        emb_in = h[idx[:, 0], :]
+        emb_out = h[idx[:, 1], :]
+        sqdist = self.manifold.sqdist(emb_in, emb_out, self.c)
+        probs = self.fd_dc.forward(sqdist)
+        return probs
 
-class Net(torch.nn.Module):
-    def __init__(self, in_channels, hidden_channels, out_channels):
-        super().__init__()
-        self.conv1 = GCNConv(in_channels, hidden_channels)
-        self.conv2 = GCNConv(hidden_channels, out_channels)
 
-    def encode(self, x, edge_index):
-        x = self.conv1(x, edge_index).relu()
-        return self.conv2(x, edge_index)
-
-    def decode(self, z, edge_label_index):
-        return (z[edge_label_index[0]] * z[edge_label_index[1]]).sum(dim=-1)
-
-    def decode_all(self, z):
-        prob_adj = z @ z.t()
-        return (prob_adj > 0).nonzero(as_tuple=False).t()
-
-
-model = Net(dataset.num_features, 128, 64).to(device)
+model = LPModel(train_data.num_features, train_data.num_features, train_data.proximity).to(device)
 optimizer = torch.optim.Adam(params=model.parameters(), lr=0.01)
 criterion = torch.nn.BCEWithLogitsLoss()
 
@@ -59,7 +82,8 @@ criterion = torch.nn.BCEWithLogitsLoss()
 def train():
     model.train()
     optimizer.zero_grad()
-    z = model.encode(train_data.x, train_data.edge_index)
+    z = model.encode(train_data.x, train_data.adj, train_data.k_diffusion_in, 
+                     train_data.k_diffusion_out, train_data.k_neighbor_in, train_data.k_neighbor_out)
 
     # We perform a new round of negative sampling for every training epoch:
     neg_edge_index = negative_sampling(

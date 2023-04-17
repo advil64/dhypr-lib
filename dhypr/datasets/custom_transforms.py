@@ -10,10 +10,15 @@ from torch_geometric.utils import to_dense_adj
 class CreateDummyFeatures(BaseTransform):
     r"""adds a dummy feature matrix if one doesn't exist"""
     def __call__(self, data: Data) -> Data:
-        assert data.num_nodes, 'data object must contain number of nodes'
         if data.x is None:
-            features = torch.eye(data.num_nodes)
+            if 'edge_label_index' in data.stores[0]:
+                adj = to_dense_adj(data.edge_label_index)[0]
+            else:
+                adj = to_dense_adj(data.edge_index)[0]
+            features = torch.eye(adj.shape[0])
             data.x = features
+            data.num_features = adj.shape[0]
+            data.num_nodes = adj.shape[0]
         return data
 
 
@@ -41,7 +46,7 @@ class GetKOrderMatrix(BaseTransform):
         data: Data,
     ) -> Data:
         print("Generating k-order matrix...")
-        self.adj = to_dense_adj(data.edge_label_index)[0].float()
+        self.adj = to_dense_adj(data.edge_label_index, max_num_nodes=data.num_nodes)[0].float()
 
         (
             data.k_diffusion_in,

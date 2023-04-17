@@ -18,9 +18,9 @@ from datasets.custom_transforms import GetKOrderMatrix, CreateDummyFeatures
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 transform = T.Compose([
+    T.ToDevice(device),
     CreateDummyFeatures(),
     T.NormalizeFeatures(),
-    T.ToDevice(device),
     T.RandomLinkSplit(num_val=0.05, num_test=0.1, is_undirected=True,
                       add_negative_train_samples=False),  # TODO: check if the random link split preserves the number of nodes in each set NOTE: (it doesn't)
     GetKOrderMatrix(),
@@ -110,7 +110,7 @@ def train():
 @torch.no_grad()
 def test(data):
     model.eval()
-    z = model.encode(data.x, data.edge_index, data.k_diffusion_in, 
+    z = model.encode(data.x, data.edge_index, data.k_diffusion_in,
                      data.k_diffusion_out, data.k_neighbor_in, data.k_neighbor_out)
     out = model.fd_decode(z[-1], data.edge_label_index).view(-1).sigmoid()
     return roc_auc_score(data.edge_label.cpu().numpy(), out.cpu().numpy())

@@ -10,6 +10,7 @@ from torch_geometric.utils import coalesce
 from torch_geometric.typing import SparseTensor
 from os import remove
 
+
 class Air(Dataset):
     r"""An implementation of the Air Traffic Control dataset as collected
     by the research group at mount sinai, more information about this dataset can 
@@ -28,7 +29,7 @@ class Air(Dataset):
             transformed version. The data object will be transformed before
             being saved to disk. (default: :obj:`None`)
     """
-    def __init__(self, name='air', transform=None, pre_transform=None, 
+    def __init__(self, name='air', transform=None, pre_transform=None,
                 proximity=1, pre_filter=None, root=None):
         self.name = name.lower()
         self.proximity = proximity
@@ -63,7 +64,6 @@ class Air(Dataset):
         my_tar = tarfile.open(path)
         remove(path)
         my_tar.extractall(self.raw_dir)
-            
 
     def process(self):
         # create an empty networkx digraph
@@ -74,11 +74,7 @@ class Air(Dataset):
             data = f.read().split('\n')[1:-1]
             for row in data:
                 src, dst = row.split()
-                G.add_edge(int(src)-1, int(dst)-1) #NOTE: -1 to make the nodes zero indexed
-
-        # generate a dummy features tensor
-        adj_matrix = nx.adjacency_matrix(G)
-        features = torch.eye(adj_matrix.shape[0])
+                G.add_edge(int(src) - 1, int(dst) - 1)  # NOTE: -1 to make the nodes zero indexed
 
         # get all edges
         original_all_edges = list(G.edges())
@@ -92,7 +88,7 @@ class Air(Dataset):
         src_pos, dest_pos = zip(*original_all_edges)
         edges = torch.tensor([src_pos, dest_pos])
 
-        self.data = Data(edge_index=edges, x=features, num_nodes=features.size(dim=0), num_features=features.size(dim=1))
+        self.data = Data(edge_index=edges)
         torch.save(self.data, self.processed_paths[0])
 
     def len(self):

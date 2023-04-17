@@ -76,16 +76,131 @@ class GetKOrderMatrix(BaseTransform):
                 )
             )
 
+        for k in range(self.k):
             # neighbor matrices
             tmp = torch.matmul(k_diffusion_in[k], k_diffusion_out[k]).int()
             tmp.fill_diagonal_(0)
             k_neighbor_in.append(
-                np.where(tmp + tmp.T - torch.diag(tmp.diagonal()) > 0.0, 1.0, 0.0)
+                torch.where(tmp + tmp.T - torch.diag(tmp.diagonal()) > 0.0, 1.0, 0.0)
             )
 
             tmp = torch.matmul(k_diffusion_out[k], k_diffusion_in[k]).int()
             tmp.fill_diagonal_(0)
             k_neighbor_out.append(
-                np.where(tmp + tmp.T - torch.diag(tmp.diagonal()) > 0.0, 1.0, 0.0)
+                torch.where(tmp + tmp.T - torch.diag(tmp.diagonal()) > 0.0, 1.0, 0.0)
             )
+
+        # convert all matrices to sparse
+        k_diffusion_in = list(map(lambda x: x.to_sparse(), k_diffusion_in))
+        k_diffusion_out = list(map(lambda x: x.to_sparse(), k_diffusion_out))
+        k_neighbor_in = list(map(lambda x: x.to_sparse(), k_neighbor_in))
+        k_neighbor_out = list(map(lambda x: x.to_sparse(), k_neighbor_out))
+
         return k_diffusion_in, k_diffusion_out, k_neighbor_in, k_diffusion_out
+
+
+
+def process_adj(data, normalize_adj):
+    data['adj_train_norm'] = dict()
+    
+    if normalize_adj:
+        if 'adj_train' in data:
+            data['adj_train_norm']['adj_train_norm'] = sparse_mx_to_torch_sparse_tensor(
+                    normalize(data['adj_train'] + sp.eye(data['adj_train'].shape[0])))
+        if 'a1_d_i' in data:
+            data['adj_train_norm']['a1_d_i_norm'] = sparse_mx_to_torch_sparse_tensor(
+                normalize(data['a1_d_i'] + sp.eye(data['a1_d_i'].shape[0])))
+        if 'a1_d_o' in data:
+            data['adj_train_norm']['a1_d_o_norm'] = sparse_mx_to_torch_sparse_tensor(
+                normalize(data['a1_d_o'] + sp.eye(data['a1_d_o'].shape[0])))
+        if 'a1_n_i' in data:
+            data['adj_train_norm']['a1_n_i_norm'] = sparse_mx_to_torch_sparse_tensor(
+                normalize(data['a1_n_i'] + sp.eye(data['a1_n_i'].shape[0])))
+        if 'a1_n_o' in data:
+            data['adj_train_norm']['a1_n_o_norm'] = sparse_mx_to_torch_sparse_tensor(
+                normalize(data['a1_n_o'] + sp.eye(data['a1_n_o'].shape[0])))
+        if 'a2_d_i' in data:
+            data['adj_train_norm']['a2_d_i_norm'] = sparse_mx_to_torch_sparse_tensor(
+                normalize(data['a2_d_i'] + sp.eye(data['a2_d_i'].shape[0])))
+        if 'a2_d_o' in data:
+            data['adj_train_norm']['a2_d_o_norm'] = sparse_mx_to_torch_sparse_tensor(
+                normalize(data['a2_d_o'] + sp.eye(data['a2_d_o'].shape[0])))
+        if 'a2_n_i' in data:
+            data['adj_train_norm']['a2_n_i_norm'] = sparse_mx_to_torch_sparse_tensor(
+                normalize(data['a2_n_i'] + sp.eye(data['a2_n_i'].shape[0])))
+        if 'a2_n_o' in data:
+            data['adj_train_norm']['a2_n_o_norm'] = sparse_mx_to_torch_sparse_tensor(
+                normalize(data['a2_n_o'] + sp.eye(data['a2_n_o'].shape[0])))
+        if 'a3_d_i' in data:
+            data['adj_train_norm']['a3_d_i_norm'] = sparse_mx_to_torch_sparse_tensor(
+                normalize(data['a3_d_i'] + sp.eye(data['a3_d_i'].shape[0])))
+        if 'a3_d_o' in data:
+            data['adj_train_norm']['a3_d_o_norm'] = sparse_mx_to_torch_sparse_tensor(
+                normalize(data['a3_d_o'] + sp.eye(data['a3_d_o'].shape[0])))
+        if 'a3_n_i' in data:
+            data['adj_train_norm']['a3_n_i_norm'] = sparse_mx_to_torch_sparse_tensor(
+                normalize(data['a3_n_i'] + sp.eye(data['a3_n_i'].shape[0])))
+        if 'a3_n_o' in data:
+            data['adj_train_norm']['a3_n_o_norm'] = sparse_mx_to_torch_sparse_tensor(
+                normalize(data['a3_n_o'] + sp.eye(data['a3_n_o'].shape[0])))
+    else:
+        if 'adj_train' in data:
+            data['adj_train_norm']['adj_train_norm'] = sparse_mx_to_torch_sparse_tensor(
+                    data['adj_train'])
+        if 'a1_d_i' in data:
+            data['adj_train_norm']['a1_d_i_norm'] = sparse_mx_to_torch_sparse_tensor(
+                    data['a1_d_i'])
+        if 'a1_d_o' in data:
+            data['adj_train_norm']['a1_d_o_norm'] = sparse_mx_to_torch_sparse_tensor(
+                    data['a1_d_o'])
+        if 'a1_n_i' in data:
+            data['adj_train_norm']['a1_n_i_norm'] = sparse_mx_to_torch_sparse_tensor(
+                    data['a1_n_i'])
+        if 'a1_n_o' in data:
+            data['adj_train_norm']['a1_n_o_norm'] = sparse_mx_to_torch_sparse_tensor(
+                data['a1_n_o'])
+        if 'a2_d_i' in data:
+            data['adj_train_norm']['a2_d_i_norm'] = sparse_mx_to_torch_sparse_tensor(
+                data['a2_d_i'])
+        if 'a2_d_o' in data:
+            data['adj_train_norm']['a2_d_o_norm'] = sparse_mx_to_torch_sparse_tensor(
+                data['a2_d_o'])
+        if 'a2_n_i' in data:
+            data['adj_train_norm']['a2_n_i_norm'] = sparse_mx_to_torch_sparse_tensor(
+                data['a2_n_i'])
+        if 'a2_n_o' in data:
+            data['adj_train_norm']['a2_n_o_norm'] = sparse_mx_to_torch_sparse_tensor(
+                data['a2_n_o'])
+        if 'a3_d_i' in data:
+            data['adj_train_norm']['a3_d_i_norm'] = sparse_mx_to_torch_sparse_tensor(
+                data['a3_d_i'])
+        if 'a3_d_o' in data:
+            data['adj_train_norm']['a3_d_o_norm'] = sparse_mx_to_torch_sparse_tensor(
+                data['a3_d_o'])
+        if 'a3_n_i' in data:
+            data['adj_train_norm']['a3_n_i_norm'] = sparse_mx_to_torch_sparse_tensor(
+                data['a3_n_i'])
+        if 'a3_n_o' in data:
+            data['adj_train_norm']['a3_n_o_norm'] = sparse_mx_to_torch_sparse_tensor(
+                data['a3_n_o'])
+            
+    return data
+
+
+def normalize(mx):
+    rowsum = np.array(mx.sum(1))
+    r_inv = np.power(rowsum, -1).flatten()
+    r_inv[np.isinf(r_inv)] = 0.
+    r_mat_inv = sp.diags(r_inv)
+    mx = r_mat_inv.dot(mx)
+    return mx
+
+
+def sparse_mx_to_torch_sparse_tensor(sparse_mx):
+    sparse_mx = sparse_mx.tocoo()
+    indices = torch.from_numpy(
+            np.vstack((sparse_mx.row, sparse_mx.col)).astype(np.int64)
+    )
+    values = torch.Tensor(sparse_mx.data)
+    shape = torch.Size(sparse_mx.shape)
+    return torch.sparse.FloatTensor(indices, values, shape)

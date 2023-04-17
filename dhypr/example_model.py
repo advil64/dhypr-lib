@@ -22,13 +22,13 @@ transform = T.Compose([
     T.NormalizeFeatures(),
     T.ToDevice(device),
     T.RandomLinkSplit(num_val=0.05, num_test=0.1, is_undirected=True,
-                      add_negative_train_samples=False), # TODO: check if the random link split preserves the number of nodes in each set
+                      add_negative_train_samples=False),  # TODO: check if the random link split preserves the number of nodes in each set NOTE: (it doesn't)
     GetKOrderMatrix(),
 ])
 path = osp.join(osp.dirname(osp.realpath(__file__)), '.', 'datasets')
-# dataset = Air(root = path, name='Air', transform=transform)
+dataset = Air(root=path, name='Air', transform=transform)
 # dataset = Planetoid(path, name='Cora', transform=transform)
-dataset = SNAPDataset(path, name='wiki-vote', transform=transform)
+# dataset = SNAPDataset(path, name='wiki-vote', transform=transform)
 
 '''
 NOTE: After applying the `RandomLinkSplit` transform, the data is transformed from
@@ -38,37 +38,38 @@ each element representing the corresponding split.
 
 train_data, val_data, test_data = dataset[0]
 
+
 class LPModel(nn.Module):
-    def __init__(self, nnodes: int, feat_dim: int, proximity: int, num_layers: int=2, dropout: float=0.05, gamma: float=1.0, 
-                 lr: float=0.001, momentum: float=0.999, weight_decay: float=0.001, hidden: int=64, device= 'cpu',
-                 dim: int=32, bias: int=1, seed: int=1234, epochs:int=500, lamb: float=0.1,  
-                 wl2: float=0.1, beta: float=1.0, r: float=2.0, t: float=1.0, alpha: float=0.2):
+
+    def __init__(self, nnodes: int, feat_dim: int, proximity: int, num_layers: int = 2, dropout: float = 0.05, gamma: float = 1.0, 
+                 lr: float = 0.001, momentum: float = 0.999, weight_decay: float = 0.001, hidden: int = 64, device='cpu',
+                 dim: int = 32, bias: int = 1, seed: int = 1234, epochs: int = 500, lamb: float = 0.1,
+                 wl2: float = 0.1, beta: float = 1.0, r: float = 2.0, t: float = 1.0, alpha: float = 0.2):
         super(LPModel, self).__init__()
-        
+
         self.c = nn.Parameter(torch.Tensor([1.]))
         self.manifold = PoincareBall()
         self.act = nn.ReLU()
-        
-        self.encoder = DHYPR(self.manifold, num_layers, proximity, feat_dim, hidden, dim, dropout, bias, alpha, nnodes, self.act, device)
-        self.dc = GravityDecoder(self.manifold, dim, 1, self.c, self.act, bias, beta, lamb)  
+
+        self.encoder = DHYPR(self.c, self.manifold, num_layers, proximity, feat_dim, hidden, dim, dropout, bias, alpha, nnodes, self.act, device)
+        self.dc = GravityDecoder(self.manifold, dim, 1, self.c, self.act, bias, beta, lamb)
         self.fd_dc = FermiDiracDecoder(r, t)
-        
+
     def encode(self, x, adj, k_diffusion_in, k_diffusion_out, k_neighbor_in, k_neighbor_out):
         h = self.encoder.forward(x, adj, k_diffusion_in, k_diffusion_out, k_neighbor_in, k_neighbor_out)
         return h
-    
-    def decode(self, h, idx): 
-        emb_in = h[idx[:, 0], :]   
-        emb_out = h[idx[:, 1], :]  
-        sqdist = self.manifold.sqdist(emb_in, emb_out, self.c)  
+
+    def decode(self, h, idx):
+        emb_in = h[idx[0], :]
+        emb_out = h[idx[1], :]
+        sqdist = self.manifold.sqdist(emb_in, emb_out, self.c)
         # squared distance between pairs of nodes in the hyperbolic space
         probs, mass = self.dc.forward(h, idx, sqdist)
         return probs, mass
-    
-    
+
     def fd_decode(self, h, idx):
-        emb_in = h[idx[:, 0], :]
-        emb_out = h[idx[:, 1], :]
+        emb_in = h[idx[0], :]
+        emb_out = h[idx[1], :]
         sqdist = self.manifold.sqdist(emb_in, emb_out, self.c)
         probs = self.fd_dc.forward(sqdist)
         return probs
@@ -99,7 +100,7 @@ def train():
         train_data.edge_label.new_zeros(neg_edge_index.size(1))
     ], dim=0)
 
-    out = model.decode(z, edge_label_index).view(-1)
+    out = model.fd_decode(z[-1], edge_label_index).view(-1)
     loss = criterion(out, edge_label)
     loss.backward()
     optimizer.step()
@@ -109,8 +110,9 @@ def train():
 @torch.no_grad()
 def test(data):
     model.eval()
-    z = model.encode(data.x, data.edge_index)
-    out = model.decode(z, data.edge_label_index).view(-1).sigmoid()
+    z = model.encode(data.x, data.edge_index, data.k_diffusion_in, 
+                     data.k_diffusion_out, data.k_neighbor_in, data.k_neighbor_out)
+    out = model.fd_decode(z[-1], data.edge_label_index).view(-1).sigmoid()
     return roc_auc_score(data.edge_label.cpu().numpy(), out.cpu().numpy())
 
 
@@ -127,5 +129,5 @@ for epoch in range(1, 101):
 
 print(f'Final Test: {final_test_auc:.4f}')
 
-z = model.encode(test_data.x, test_data.edge_index)
-final_edge_index = model.decode_all(z)
+# z = model.encode(test_data.x, test_data.edge_index)
+# final_edge_index = model.decode_all(z)

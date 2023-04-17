@@ -12,7 +12,7 @@ import numpy as np
 import optimizers
 import torch
 from config import parser
-from dhypr.models.BaseModel import NCModel, LPModel, SPModel
+from misc.BaseModel import NCModel, LPModel, SPModel
 from utils.data_utils import load_data
 from utils.train_utils import get_dir_name, format_metrics, save_results
 import pdb

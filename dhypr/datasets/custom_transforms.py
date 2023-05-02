@@ -1,24 +1,25 @@
 import torch
-import numpy as np
+import torch.nn.functional as f
 
 from torch_geometric.data import Data
 from torch_geometric.data.datapipes import functional_transform
 from torch_geometric.transforms import BaseTransform
 from torch_geometric.utils import to_dense_adj
 
+
 @functional_transform("create_dummy_features")
 class CreateDummyFeatures(BaseTransform):
     r"""adds a dummy feature matrix if one doesn't exist"""
     def __call__(self, data: Data) -> Data:
-        if data.x is None:
-            if 'edge_label_index' in data.stores[0]:
-                adj = to_dense_adj(data.edge_label_index)[0]
-            else:
-                adj = to_dense_adj(data.edge_index)[0]
-            features = torch.eye(adj.shape[0])
-            data.x = features
-            data.num_features = adj.shape[0]
-            data.num_nodes = adj.shape[0]
+        # if data.x is None: TODO: think of a way to actually use the features
+        if 'edge_label_index' in data.stores[0]:
+            adj = to_dense_adj(data.edge_label_index)[0]
+        else:
+            adj = to_dense_adj(data.edge_index)[0]
+        features = torch.eye(adj.shape[0])
+        data.x = features
+        data.num_features = adj.shape[0]
+        data.num_nodes = adj.shape[0]
         return data
 
 
@@ -32,11 +33,12 @@ class GetKOrderMatrix(BaseTransform):
     TODO add on support for hetero data objects
     """
 
-    def __init__(self, is_undirected: bool = False, k: int = 2):
+    def __init__(self, normalize: bool = True, is_undirected: bool = False, k: int = 2):
         assert k <= 5, "max value for k is 5"
 
         self.is_undirected = is_undirected
         self.k = k
+        self.normalize = normalize
 
         # populated in the call function
         self.adj = None
@@ -55,9 +57,18 @@ class GetKOrderMatrix(BaseTransform):
             data.k_neighbor_out,
         ) = self._compute_proximity_matrices()
         data.proximity = self.k
-        data.adj = self.adj
+        data.adj = self._normalize(self.adj) if self.normalize else self.adj
         print("Done!")
         return data
+
+    def _normalize(self, mx: torch.tensor):
+        mx += torch.eye(mx.size(0))
+        rowsum = mx.sum(1)
+        r_inv = torch.pow(rowsum, -1).flatten()
+        r_inv[torch.isinf(r_inv)] = 0.
+        r_mat_inv = torch.diag(r_inv)
+        mx = r_mat_inv @ mx
+        return mx
 
     def _compute_proximity_matrices(self):
         k_diffusion_in = []
@@ -95,6 +106,13 @@ class GetKOrderMatrix(BaseTransform):
                 torch.where(tmp + tmp.T - torch.diag(tmp.diagonal()) > 0.0, 1.0, 0.0)
             )
 
+        # normalize if necessary also taken from the paper
+        if self.normalize:
+            k_diffusion_in = list(map(self._normalize, k_diffusion_in))
+            k_diffusion_out = list(map(self._normalize, k_diffusion_out))
+            k_neighbor_in = list(map(self._normalize, k_neighbor_in))
+            k_neighbor_out = list(map(self._normalize, k_neighbor_out))
+
         # convert all matrices to sparse
         k_diffusion_in = list(map(lambda x: x.to_sparse(), k_diffusion_in))
         k_diffusion_out = list(map(lambda x: x.to_sparse(), k_diffusion_out))
@@ -102,110 +120,3 @@ class GetKOrderMatrix(BaseTransform):
         k_neighbor_out = list(map(lambda x: x.to_sparse(), k_neighbor_out))
 
         return k_diffusion_in, k_diffusion_out, k_neighbor_in, k_diffusion_out
-
-
-
-def process_adj(data, normalize_adj):
-    data['adj_train_norm'] = dict()
-    
-    if normalize_adj:
-        if 'adj_train' in data:
-            data['adj_train_norm']['adj_train_norm'] = sparse_mx_to_torch_sparse_tensor(
-                    normalize(data['adj_train'] + sp.eye(data['adj_train'].shape[0])))
-        if 'a1_d_i' in data:
-            data['adj_train_norm']['a1_d_i_norm'] = sparse_mx_to_torch_sparse_tensor(
-                normalize(data['a1_d_i'] + sp.eye(data['a1_d_i'].shape[0])))
-        if 'a1_d_o' in data:
-            data['adj_train_norm']['a1_d_o_norm'] = sparse_mx_to_torch_sparse_tensor(
-                normalize(data['a1_d_o'] + sp.eye(data['a1_d_o'].shape[0])))
-        if 'a1_n_i' in data:
-            data['adj_train_norm']['a1_n_i_norm'] = sparse_mx_to_torch_sparse_tensor(
-                normalize(data['a1_n_i'] + sp.eye(data['a1_n_i'].shape[0])))
-        if 'a1_n_o' in data:
-            data['adj_train_norm']['a1_n_o_norm'] = sparse_mx_to_torch_sparse_tensor(
-                normalize(data['a1_n_o'] + sp.eye(data['a1_n_o'].shape[0])))
-        if 'a2_d_i' in data:
-            data['adj_train_norm']['a2_d_i_norm'] = sparse_mx_to_torch_sparse_tensor(
-                normalize(data['a2_d_i'] + sp.eye(data['a2_d_i'].shape[0])))
-        if 'a2_d_o' in data:
-            data['adj_train_norm']['a2_d_o_norm'] = sparse_mx_to_torch_sparse_tensor(
-                normalize(data['a2_d_o'] + sp.eye(data['a2_d_o'].shape[0])))
-        if 'a2_n_i' in data:
-            data['adj_train_norm']['a2_n_i_norm'] = sparse_mx_to_torch_sparse_tensor(
-                normalize(data['a2_n_i'] + sp.eye(data['a2_n_i'].shape[0])))
-        if 'a2_n_o' in data:
-            data['adj_train_norm']['a2_n_o_norm'] = sparse_mx_to_torch_sparse_tensor(
-                normalize(data['a2_n_o'] + sp.eye(data['a2_n_o'].shape[0])))
-        if 'a3_d_i' in data:
-            data['adj_train_norm']['a3_d_i_norm'] = sparse_mx_to_torch_sparse_tensor(
-                normalize(data['a3_d_i'] + sp.eye(data['a3_d_i'].shape[0])))
-        if 'a3_d_o' in data:
-            data['adj_train_norm']['a3_d_o_norm'] = sparse_mx_to_torch_sparse_tensor(
-                normalize(data['a3_d_o'] + sp.eye(data['a3_d_o'].shape[0])))
-        if 'a3_n_i' in data:
-            data['adj_train_norm']['a3_n_i_norm'] = sparse_mx_to_torch_sparse_tensor(
-                normalize(data['a3_n_i'] + sp.eye(data['a3_n_i'].shape[0])))
-        if 'a3_n_o' in data:
-            data['adj_train_norm']['a3_n_o_norm'] = sparse_mx_to_torch_sparse_tensor(
-                normalize(data['a3_n_o'] + sp.eye(data['a3_n_o'].shape[0])))
-    else:
-        if 'adj_train' in data:
-            data['adj_train_norm']['adj_train_norm'] = sparse_mx_to_torch_sparse_tensor(
-                    data['adj_train'])
-        if 'a1_d_i' in data:
-            data['adj_train_norm']['a1_d_i_norm'] = sparse_mx_to_torch_sparse_tensor(
-                    data['a1_d_i'])
-        if 'a1_d_o' in data:
-            data['adj_train_norm']['a1_d_o_norm'] = sparse_mx_to_torch_sparse_tensor(
-                    data['a1_d_o'])
-        if 'a1_n_i' in data:
-            data['adj_train_norm']['a1_n_i_norm'] = sparse_mx_to_torch_sparse_tensor(
-                    data['a1_n_i'])
-        if 'a1_n_o' in data:
-            data['adj_train_norm']['a1_n_o_norm'] = sparse_mx_to_torch_sparse_tensor(
-                data['a1_n_o'])
-        if 'a2_d_i' in data:
-            data['adj_train_norm']['a2_d_i_norm'] = sparse_mx_to_torch_sparse_tensor(
-                data['a2_d_i'])
-        if 'a2_d_o' in data:
-            data['adj_train_norm']['a2_d_o_norm'] = sparse_mx_to_torch_sparse_tensor(
-                data['a2_d_o'])
-        if 'a2_n_i' in data:
-            data['adj_train_norm']['a2_n_i_norm'] = sparse_mx_to_torch_sparse_tensor(
-                data['a2_n_i'])
-        if 'a2_n_o' in data:
-            data['adj_train_norm']['a2_n_o_norm'] = sparse_mx_to_torch_sparse_tensor(
-                data['a2_n_o'])
-        if 'a3_d_i' in data:
-            data['adj_train_norm']['a3_d_i_norm'] = sparse_mx_to_torch_sparse_tensor(
-                data['a3_d_i'])
-        if 'a3_d_o' in data:
-            data['adj_train_norm']['a3_d_o_norm'] = sparse_mx_to_torch_sparse_tensor(
-                data['a3_d_o'])
-        if 'a3_n_i' in data:
-            data['adj_train_norm']['a3_n_i_norm'] = sparse_mx_to_torch_sparse_tensor(
-                data['a3_n_i'])
-        if 'a3_n_o' in data:
-            data['adj_train_norm']['a3_n_o_norm'] = sparse_mx_to_torch_sparse_tensor(
-                data['a3_n_o'])
-            
-    return data
-
-
-def normalize(mx):
-    rowsum = np.array(mx.sum(1))
-    r_inv = np.power(rowsum, -1).flatten()
-    r_inv[np.isinf(r_inv)] = 0.
-    r_mat_inv = sp.diags(r_inv)
-    mx = r_mat_inv.dot(mx)
-    return mx
-
-
-def sparse_mx_to_torch_sparse_tensor(sparse_mx):
-    sparse_mx = sparse_mx.tocoo()
-    indices = torch.from_numpy(
-            np.vstack((sparse_mx.row, sparse_mx.col)).astype(np.int64)
-    )
-    values = torch.Tensor(sparse_mx.data)
-    shape = torch.Size(sparse_mx.shape)
-    return torch.sparse.FloatTensor(indices, values, shape)

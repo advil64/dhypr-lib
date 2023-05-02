@@ -21,7 +21,7 @@ transform = T.Compose([
     T.ToDevice(device),
     CreateDummyFeatures(),
     T.NormalizeFeatures(),
-    T.RandomLinkSplit(num_val=0.05, num_test=0.1, is_undirected=True,
+    T.RandomLinkSplit(num_val=0.05, num_test=0.1, is_undirected=False,
                       add_negative_train_samples=False),  # TODO: check if the random link split preserves the number of nodes in each set NOTE: (it doesn't)
     GetKOrderMatrix(),
 ])
@@ -41,8 +41,8 @@ train_data, val_data, test_data = dataset[0]
 
 class LPModel(nn.Module):
 
-    def __init__(self, nnodes: int, feat_dim: int, proximity: int, num_layers: int = 2, dropout: float = 0.05, gamma: float = 1.0, 
-                 lr: float = 0.001, momentum: float = 0.999, weight_decay: float = 0.001, hidden: int = 64, device='cpu',
+    def __init__(self, nnodes: int, feat_dim: int, proximity: int, num_layers: int = 2, dropout: float = 0.05,
+                 momentum: float = 0.999, hidden: int = 64, device='cpu',
                  dim: int = 32, bias: int = 1, seed: int = 1234, epochs: int = 500, lamb: float = 0.1,
                  wl2: float = 0.1, beta: float = 1.0, r: float = 2.0, t: float = 1.0, alpha: float = 0.2):
         super(LPModel, self).__init__()
@@ -76,14 +76,15 @@ class LPModel(nn.Module):
 
 
 model = LPModel(train_data.num_features, train_data.num_features, train_data.proximity).to(device)
-optimizer = torch.optim.Adam(params=model.parameters(), lr=0.01)
+optimizer = torch.optim.Adam(params=model.parameters(), lr=0.001, weight_decay=0.001)
+# lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=0.001, gamma=1.0)
 criterion = torch.nn.BCEWithLogitsLoss()
 
 
 def train():
     model.train()
     optimizer.zero_grad()
-    z = model.encode(train_data.x, train_data.adj, train_data.k_diffusion_in, 
+    z = model.encode(train_data.x, train_data.adj, train_data.k_diffusion_in,
                      train_data.k_diffusion_out, train_data.k_neighbor_in, train_data.k_neighbor_out)
 
     # We perform a new round of negative sampling for every training epoch:
@@ -91,10 +92,11 @@ def train():
         edge_index=train_data.edge_index, num_nodes=train_data.num_nodes,
         num_neg_samples=train_data.edge_label_index.size(1), method='sparse')
 
-    edge_label_index = torch.cat(
-        [train_data.edge_label_index, neg_edge_index],
-        dim=-1,
-    )
+    edge_label_index = torch.cat([
+        train_data.edge_label_index,
+        neg_edge_index
+    ], dim=-1)
+
     edge_label = torch.cat([
         train_data.edge_label,
         train_data.edge_label.new_zeros(neg_edge_index.size(1))
@@ -104,6 +106,7 @@ def train():
     loss = criterion(out, edge_label)
     loss.backward()
     optimizer.step()
+    # lr_scheduler.step()
     return loss
 
 

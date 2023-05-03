@@ -10,6 +10,8 @@ from torch_geometric.datasets import Planetoid
 import torch_geometric.transforms as T
 from torch_geometric.nn import GCNConv
 from torch_geometric.utils import train_test_split_edges
+from datasets.air import Air
+from datasets.custom_transforms import CreateDummyFeatures
 
  # %% [markdown]
  # # GAE for link prediction
@@ -22,12 +24,16 @@ from torch_geometric.utils import train_test_split_edges
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 device = "cpu"
+transform = T.Compose([
+    T.ToDevice(device),
+    CreateDummyFeatures(),
+    T.NormalizeFeatures()
+])
 
  # %%
  # load the Cora dataset
-dataset = 'Cora'
-path = osp.join('.', 'datasets', dataset)
-dataset = Planetoid(path, dataset, transform=T.NormalizeFeatures())
+path = osp.join(osp.dirname(osp.realpath(__file__)), '.', 'datasets')
+dataset = Air(root=path, name='Air', transform=transform)
 data = dataset[0]
 print(dataset.data)
 

@@ -19,10 +19,10 @@ class DHYPR(nn.Module):
         self.dims, self.acts, self.curvatures = hyp_layers.get_dim_act_curv(num_layers, feat_dim, hidden, dim, act, c, device)
         self.curvatures.append(c)
 
-        self.k_diffusion_in_layers = []
-        self.k_diffusion_out_layers = []
-        self.k_neighbor_in_layers = []
-        self.k_neighbor_out_layers = []
+        self.k_diffusion_in_layers = nn.ModuleList()
+        self.k_diffusion_out_layers = nn.ModuleList()
+        self.k_neighbor_in_layers = nn.ModuleList()
+        self.k_neighbor_out_layers = nn.ModuleList()
 
         for i in range(proximity):
             # one layer for each k order matrix entry

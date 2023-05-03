@@ -10,6 +10,7 @@ from torch_geometric.datasets import SNAPDataset, Planetoid
 from torch_geometric.utils import negative_sampling
 
 from models.manifolds.poincare import PoincareBall
+from models.manifolds.base import Manifold
 from models.encoders import DHYPR
 from models.layers.layers import FermiDiracDecoder, GravityDecoder
 
@@ -26,8 +27,8 @@ transform = T.Compose([
     GetKOrderMatrix(),
 ])
 path = osp.join(osp.dirname(osp.realpath(__file__)), '.', 'datasets')
-dataset = Air(root=path, name='Air', transform=transform)
-# dataset = Planetoid(path, name='Cora', transform=transform)
+# dataset = Air(root=path, name='Air', transform=transform)
+dataset = Planetoid(path, name='Cora', transform=transform)
 # dataset = SNAPDataset(path, name='wiki-vote', transform=transform)
 
 '''
@@ -76,7 +77,7 @@ class LPModel(nn.Module):
 
 
 model = LPModel(train_data.num_features, train_data.num_features, train_data.proximity).to(device)
-optimizer = torch.optim.Adam(params=model.parameters(), lr=0.001, weight_decay=0.001)
+optimizer = torch.optim.Adam(params=model.parameters(), lr=0.001)
 # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=0.001, gamma=1.0)
 criterion = torch.nn.BCEWithLogitsLoss()
 
@@ -120,7 +121,7 @@ def test(data):
 
 
 best_val_auc = final_test_auc = 0
-for epoch in range(1, 101):
+for epoch in range(1, 500):
     loss = train()
     val_auc = test(val_data)
     test_auc = test(test_data)

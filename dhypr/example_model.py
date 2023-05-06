@@ -27,8 +27,8 @@ transform = T.Compose([
     GetKOrderMatrix(),
 ])
 path = osp.join(osp.dirname(osp.realpath(__file__)), '.', 'datasets')
-# dataset = Air(root=path, name='Air', transform=transform)
-dataset = Planetoid(path, name='Cora', transform=transform)
+dataset = Air(root=path, name='Air', transform=transform)
+# dataset = Planetoid(path, name='Cora', transform=transform)
 # dataset = SNAPDataset(path, name='wiki-vote', transform=transform)
 
 '''

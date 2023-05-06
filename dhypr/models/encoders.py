@@ -38,7 +38,7 @@ class DHYPR(nn.Module):
         self.embed_agg_adj_size = n_nodes * self.nrepre
         self.use_att = use_att
 
-        embed_agg_adj = np.zeros((self.embed_agg_adj_size, self.embed_agg_adj_size))
+        embed_agg_adj = np.zeros((self.embed_agg_adj_size, self.embed_agg_adj_size), dtype=np.float32)
         for n in range(self.nnodes):
             block_start = n * self.nrepre
             embed_agg_adj[block_start][block_start + 1: block_start + self.nrepre] = 1

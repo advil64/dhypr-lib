@@ -16,7 +16,7 @@ class CreateDummyFeatures(BaseTransform):
             adj = to_dense_adj(data.edge_label_index)[0]
         else:
             adj = to_dense_adj(data.edge_index)[0]
-        features = torch.eye(adj.shape[0])
+        features = torch.eye(adj.shape[0], device=data.edge_index.device)
         data.x = features
         data.num_features = adj.shape[0]
         data.num_nodes = adj.shape[0]
@@ -62,7 +62,7 @@ class GetKOrderMatrix(BaseTransform):
         return data
 
     def _normalize(self, mx: torch.tensor):
-        mx += torch.eye(mx.size(0))
+        mx += torch.eye(mx.size(0), device=mx.device)
         rowsum = mx.sum(1)
         r_inv = torch.pow(rowsum, -1).flatten()
         r_inv[torch.isinf(r_inv)] = 0.

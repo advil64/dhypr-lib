@@ -27,8 +27,8 @@ transform = T.Compose([
     GetKOrderMatrix(),
 ])
 path = osp.join(osp.dirname(osp.realpath(__file__)), '.', 'datasets')
-dataset = Air(root=path, name='Air', transform=transform)
-# dataset = Planetoid(path, name='Cora', transform=transform)
+# dataset = Air(root=path, name='Air', transform=transform)
+dataset = Planetoid(path, name='Cora', transform=transform)
 # dataset = SNAPDataset(path, name='wiki-vote', transform=transform)
 
 '''
@@ -76,7 +76,7 @@ class LPModel(nn.Module):
         return probs
 
 
-model = LPModel(train_data.num_features, train_data.num_features, train_data.proximity).to(device)
+model = LPModel(train_data.num_features, train_data.num_features, train_data.proximity, device=device).to(device)
 optimizer = torch.optim.Adam(params=model.parameters(), lr=0.001)
 # lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=0.001, gamma=1.0)
 criterion = torch.nn.BCEWithLogitsLoss()
